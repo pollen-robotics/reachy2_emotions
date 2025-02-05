@@ -5,6 +5,13 @@
 pip3 install sounddevice soundfile
 ```
 
+## Common commands
+```
+python3 replay_move.py  --audio-offset -2.0
+
+python3 record_move.py
+```
+
 ## Source code
 The list and versions of the repos of the hackathon emotion project are on the emotion branch:
 https://github.com/pollen-robotics/docker_reachy2_core/tree/emotions

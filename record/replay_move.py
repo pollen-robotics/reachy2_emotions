@@ -50,22 +50,29 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
     return np.max([distance_l_arm, distance_r_arm])
 
 
-def play_audio(audio_file: str, audio_device: Optional[str], start_event: threading.Event,
+def play_audio(audio_file: str, audio_device: Optional[str],
+               start_event: threading.Event, audio_offset: float,
                default_sample_rate: int = 44100):
     """
-    Load the recorded audio file and wait for a common start event before playback.
-    This function runs in its own thread.
+    Load the recorded audio file and wait for a common start trigger.
+    
+    If audio_offset is positive, delay playback by that many seconds;
+    if negative, start playback immediately.
     """
     try:
         data, sample_rate = sf.read(audio_file, dtype="float32")
         if sample_rate != default_sample_rate:
             print(f"Warning: Recorded sample rate ({sample_rate}) differs from default ({default_sample_rate}).")
         print("Audio thread ready. Waiting for start trigger...")
-
-        # Wait until the main thread signals to start both audio and motion replay.
-        start_event.wait()
         
-        # Optionally, try lowering the latency parameter if supported.
+        # Wait for the common start trigger.
+        start_event.wait()
+
+        # If the offset is positive, delay the audio playback.
+        if audio_offset > 0:
+            print(f"Delaying audio playback for {audio_offset} seconds.")
+            time.sleep(audio_offset)
+        # If negative, start immediately.
         print("Starting audio playback on device:", audio_device)
         sd.play(data, samplerate=sample_rate, device=audio_device, latency='low')
         sd.wait()
@@ -76,7 +83,7 @@ def play_audio(audio_file: str, audio_device: Optional[str], start_event: thread
         print(sd.query_devices())
 
 
-def main(ip: str, filename: Optional[str], audio_device: Optional[str]):
+def main(ip: str, filename: Optional[str], audio_device: Optional[str], audio_offset: float):
     # Connect to Reachy.
     reachy = ReachySDK(host=ip)
 
@@ -101,20 +108,19 @@ def main(ip: str, filename: Optional[str], audio_device: Optional[str]):
     # Check current positions to adapt the duration of the initial move.
     max_dist = distance_with_new_pose(reachy, data)
     first_duration = max_dist * 10 if max_dist > 0.2 else 2
-    
+
     # Create an event to synchronize the start of motion and audio replay.
     start_event = threading.Event()
 
     # Start audio playback in a separate thread if an audio file is available.
     audio_thread = None
     if audio_available:
-        audio_thread = threading.Thread(target=play_audio, args=(audio_file, audio_device, start_event))
+        audio_thread = threading.Thread(target=play_audio,
+                                        args=(audio_file, audio_device, start_event, audio_offset))
         audio_thread.start()
 
     input("Is Reachy ready to move? Press Enter to continue.")
     reachy.turn_on()
-    
-
 
     # Move Reachy to the initial recorded position.
     reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
@@ -124,12 +130,16 @@ def main(ip: str, filename: Optional[str], audio_device: Optional[str]):
     reachy.head.goto(data["head"][0], duration=first_duration, wait=True)
     print("First position reached.")
 
-
-
-    # Signal both threads to start simultaneously.
+    # Signal the start event.
     start_event.set()
     
-    time.sleep(2.0) # TODO why do I need this?
+    # If the audio offset is negative, wait before starting motion replay
+    # so that audio starts playing earlier.
+    if audio_offset < 0:
+        wait_time = abs(audio_offset)
+        print(f"Waiting {wait_time} seconds before starting motion replay to allow audio to lead.")
+        time.sleep(wait_time)
+    
     t0 = time.time()
 
     # Start replaying motion data.
@@ -168,7 +178,8 @@ def main(ip: str, filename: Optional[str], audio_device: Optional[str]):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Replay Reachy's movements along with recorded audio (if available), synchronized to start together."
+        description="Replay Reachy's movements along with recorded audio (if available). "
+                    "Use --audio-offset to adjust the timing: positive delays audio, negative starts it earlier."
     )
     parser.add_argument(
         "--ip",
@@ -189,6 +200,13 @@ if __name__ == "__main__":
         help="Identifier of the audio output device for playback (if needed)"
     )
     parser.add_argument(
+        "--audio-offset",
+        type=float,
+        default=0.0,
+        help="Time offset (in seconds) for audio playback relative to motion replay. "
+             "Negative means audio starts earlier, positive means audio is delayed."
+    )
+    parser.add_argument(
         "--list-audio-devices",
         action="store_true",
         help="List available audio devices and exit"
@@ -199,4 +217,4 @@ if __name__ == "__main__":
         print(sd.query_devices())
         exit(0)
 
-    main(args.ip, args.filename, args.audio_device)
+    main(args.ip, args.filename, args.audio_device, args.audio_offset)
