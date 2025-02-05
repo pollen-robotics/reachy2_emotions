@@ -1,5 +1,10 @@
 # reachy2_emotions
 
+## Installation
+```
+pip3 install sounddevice soundfile
+```
+
 ## Source code
 The list and versions of the repos of the hackathon emotion project are on the emotion branch:
 https://github.com/pollen-robotics/docker_reachy2_core/tree/emotions

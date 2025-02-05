@@ -2,59 +2,38 @@ import argparse
 import json
 import os
 import time
-from typing import Optional, Tuple
-
+import threading
 import numpy as np
+import sounddevice as sd
+import soundfile as sf
+
+from typing import Optional, Tuple
 from reachy2_sdk import ReachySDK  # type: ignore
 
 
 def get_last_recording(folder: str) -> str:
-    """Retrieve the most recent recording file from a specified folder.
-
-    Args:
-        folder (str): Path to the folder containing recording files.
-
-    Returns:
-        str: The name of the most recently created recording file.
-    """
+    """Retrieve the most recent JSON recording file from a folder."""
     files = [
         f for f in os.listdir(folder)
-        if os.path.isfile(os.path.join(folder, f))
+        if os.path.isfile(os.path.join(folder, f)) and f.endswith('.json')
     ]
     files.sort(key=lambda f: os.path.getctime(os.path.join(folder, f)))
     return files[-1]
 
 
 def load_data(path: str) -> Tuple[dict, float]:
-    """Load recording data and extract the time interval between frames.
-
-    Args:
-        path (str): Path to the folder containing the recording.
-        filename (str): Name of the file to load.
-
-    Returns:
-        Tuple[dict, float]: A tuple containing the loaded data dictionary and
-            the time interval between frames.
-    """
+    """Load the JSON recording and compute the timeframe between frames."""
     with open(path, "r") as f:
         data = json.load(f)
         print(f"Data loaded from {path}")
+    if len(data["time"]) < 2:
+        raise ValueError("Insufficient time data in the recording.")
     timeframe = data["time"][1] - data["time"][0]
     return data, timeframe
 
 
 def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
-    """Calculate the maximum distance between the current arm positions
-        and the first positions from the data.
-
-    Args:
-        reachy (ReachySDK): The Reachy robot object.
-        data (dict): The recording data containing arm positions.
-
-    Returns:
-        float: The maximum distance between the current and initial positions
-            of the arms.
-    """
+    """Compute the maximum Euclidean distance between the current arm poses and the first recorded poses."""
     first_l_arm_pose = reachy.l_arm.forward_kinematics(data["l_arm"][0])
     first_r_arm_pose = reachy.r_arm.forward_kinematics(data["r_arm"][0])
 
@@ -71,107 +50,153 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
     return np.max([distance_l_arm, distance_r_arm])
 
 
-def main(ip: str, filename: Optional[str]):
-    """Main function to connect to Reachy, load a recorded movement,
-        and replay it on the robot.
-
-    Args:
-        ip (str): IP address of the Reachy robot.
-        filename (Optional[str]): Name of the recording file to replay.
-            If not provided, the most recent recording will be used.
+def play_audio(audio_file: str, audio_device: Optional[str], start_event: threading.Event,
+               default_sample_rate: int = 44100):
     """
+    Load the recorded audio file and wait for a common start event before playback.
+    This function runs in its own thread.
+    """
+    try:
+        data, sample_rate = sf.read(audio_file, dtype="float32")
+        if sample_rate != default_sample_rate:
+            print(f"Warning: Recorded sample rate ({sample_rate}) differs from default ({default_sample_rate}).")
+        print("Audio thread ready. Waiting for start trigger...")
 
-    # connect to Reachy
+        # Wait until the main thread signals to start both audio and motion replay.
+        start_event.wait()
+        
+        # Optionally, try lowering the latency parameter if supported.
+        print("Starting audio playback on device:", audio_device)
+        sd.play(data, samplerate=sample_rate, device=audio_device, latency='low')
+        sd.wait()
+        print("Audio playback finished.")
+    except Exception as e:
+        print("Error during audio playback:", e)
+        print("Available audio devices:")
+        print(sd.query_devices())
+
+
+def main(ip: str, filename: Optional[str], audio_device: Optional[str]):
+    # Connect to Reachy.
     reachy = ReachySDK(host=ip)
 
-    # get the last recording file if no filename is given
+    # Determine which JSON file to use.
     if filename is None:
         folder = "recordings"
-        filename = get_last_recording(folder) 
+        filename = get_last_recording(folder)
         path = os.path.join(folder, filename)
-    
-    else: 
+    else:
         path = filename
 
-    # load the data and the timeframe from the file
     data, timeframe = load_data(path)
 
-    # check the distance between the current position of arms
-    # and the first position and adapt the duration of the first move
+    # Determine corresponding audio file (same base name with .wav extension)
+    audio_file = os.path.splitext(path)[0] + ".wav"
+    audio_available = os.path.exists(audio_file)
+    if audio_available:
+        print(f"Found corresponding audio file: {audio_file}")
+    else:
+        print("No audio file found. Only motion replay will be executed.")
+
+    # Check current positions to adapt the duration of the initial move.
     max_dist = distance_with_new_pose(reachy, data)
     first_duration = max_dist * 10 if max_dist > 0.2 else 2
+    
+    # Create an event to synchronize the start of motion and audio replay.
+    start_event = threading.Event()
 
-    # wait for the user to press enter
-    input("Is Reachy ready to move ? Press Enter to continue.")
+    # Start audio playback in a separate thread if an audio file is available.
+    audio_thread = None
+    if audio_available:
+        audio_thread = threading.Thread(target=play_audio, args=(audio_file, audio_device, start_event))
+        audio_thread.start()
 
-    # set Reachy on the first position with a goto
+    input("Is Reachy ready to move? Press Enter to continue.")
+    reachy.turn_on()
+    
+
+
+    # Move Reachy to the initial recorded position.
     reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
     reachy.r_arm.goto(data["r_arm"][0], duration=first_duration)
     reachy.l_arm.gripper.set_opening(data["l_hand"][0])
     reachy.r_arm.gripper.set_opening(data["r_hand"][0])
     reachy.head.goto(data["head"][0], duration=first_duration, wait=True)
-    
-    # TODO check if we want to do this for antennas too?
-
     print("First position reached.")
 
+
+
+    # Signal both threads to start simultaneously.
+    start_event.set()
+    
+    time.sleep(2.0) # TODO why do I need this?
     t0 = time.time()
 
-    # replay the data
+    # Start replaying motion data.
     try:
         for ite in range(len(data["time"])):
             start_t = time.time() - t0
 
-            for joint, goal in zip(
-                reachy.l_arm.joints.values(), data["l_arm"][ite]
-            ):
+            # Update joint goals for left arm, right arm, and head.
+            for joint, goal in zip(reachy.l_arm.joints.values(), data["l_arm"][ite]):
                 joint.goal_position = goal
-            for joint, goal in zip(
-                reachy.r_arm.joints.values(), data["r_arm"][ite]
-            ):
+            for joint, goal in zip(reachy.r_arm.joints.values(), data["r_arm"][ite]):
                 joint.goal_position = goal
-            for joint, goal in zip(
-                reachy.head.joints.values(), data["head"][ite]
-            ):
+            for joint, goal in zip(reachy.head.joints.values(), data["head"][ite]):
                 joint.goal_position = goal
 
             reachy.l_arm.gripper.goal_position = data["l_hand"][ite]
             reachy.r_arm.gripper.goal_position = data["r_hand"][ite]
-            
             reachy.head.l_antenna.goal_position = data["l_antenna"][ite]
             reachy.head.r_antenna.goal_position = data["r_antenna"][ite]
-            
 
             reachy.send_goal_positions(check_positions=False)
 
+            # Maintain the same timeframe between frames.
             left_time = timeframe - (time.time() - t0 - start_t)
             if left_time > 0:
                 time.sleep(left_time)
         else:
-            print(
-                "End of the recording. Time of the replaying : ",
-                time.time() - t0
-            )
-
+            print("End of the recording. Replay duration: {:.2f} seconds".format(time.time() - t0))
     except KeyboardInterrupt:
         print("Replay stopped by the user.")
 
+    # Wait for the audio thread to finish if it was started.
+    if audio_thread is not None:
+        audio_thread.join()
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Replay Reachy's movements along with recorded audio (if available), synchronized to start together."
+    )
     parser.add_argument(
         "--ip",
         type=str,
         default="localhost",
-        help="IP address of the robot",
+        help="IP address of the robot"
     )
     parser.add_argument(
         "--filename",
         type=str,
         default=None,
-        help="Optional name of the file to replay",
+        help="Optional name of the JSON recording file to replay"
     )
-
+    parser.add_argument(
+        "--audio-device",
+        type=str,
+        default=None,
+        help="Identifier of the audio output device for playback (if needed)"
+    )
+    parser.add_argument(
+        "--list-audio-devices",
+        action="store_true",
+        help="List available audio devices and exit"
+    )
     args = parser.parse_args()
 
-    main(args.ip, args.filename)
+    if args.list_audio_devices:
+        print(sd.query_devices())
+        exit(0)
+
+    main(args.ip, args.filename, args.audio_device)
