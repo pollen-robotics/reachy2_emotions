@@ -25,21 +25,20 @@ def get_last_recording(folder: str) -> str:
     return files[-1]
 
 
-def load_data(folder: str, filename: str) -> Tuple[dict, float]:
+def load_data(path: str) -> Tuple[dict, float]:
     """Load recording data and extract the time interval between frames.
 
     Args:
-        folder (str): Path to the folder containing the recording.
+        path (str): Path to the folder containing the recording.
         filename (str): Name of the file to load.
 
     Returns:
         Tuple[dict, float]: A tuple containing the loaded data dictionary and
             the time interval between frames.
     """
-    file_path = os.path.join(folder, filename)
-    with open(file_path, "r") as f:
+    with open(path, "r") as f:
         data = json.load(f)
-        print(f"Data loaded from {filename}")
+        print(f"Data loaded from {path}")
     timeframe = data["time"][1] - data["time"][0]
     return data, timeframe
 
@@ -86,12 +85,16 @@ def main(ip: str, filename: Optional[str]):
     reachy = ReachySDK(host=ip)
 
     # get the last recording file if no filename is given
-    folder = "recordings"
-    filename = get_last_recording(folder) if filename is None\
-        else filename + ".json"
+    if filename is None:
+        folder = "recordings"
+        filename = get_last_recording(folder) 
+        path = os.path.join(folder, filename)
+    
+    else: 
+        path = filename
 
     # load the data and the timeframe from the file
-    data, timeframe = load_data(folder, filename)
+    data, timeframe = load_data(path)
 
     # check the distance between the current position of arms
     # and the first position and adapt the duration of the first move
@@ -107,6 +110,8 @@ def main(ip: str, filename: Optional[str]):
     reachy.l_arm.gripper.set_opening(data["l_hand"][0])
     reachy.r_arm.gripper.set_opening(data["r_hand"][0])
     reachy.head.goto(data["head"][0], duration=first_duration, wait=True)
+    
+    # TODO check if we want to do this for antennas too?
 
     print("First position reached.")
 
@@ -132,6 +137,10 @@ def main(ip: str, filename: Optional[str]):
 
             reachy.l_arm.gripper.goal_position = data["l_hand"][ite]
             reachy.r_arm.gripper.goal_position = data["r_hand"][ite]
+            
+            reachy.head.l_antenna.goal_position = data["l_antenna"][ite]
+            reachy.head.r_antenna.goal_position = data["r_antenna"][ite]
+            
 
             reachy.send_goal_positions(check_positions=False)
 
