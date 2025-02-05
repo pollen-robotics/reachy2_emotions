@@ -72,7 +72,7 @@ CTRL-C  or press CIRCLE on the controller to quit
 # These are integer values between 0 and 100
 TORQUE_LIMIT=100
 SPEED_LIMIT=100
-
+MAX_ANTENNA_ANGLE = 130 # to be checked
 ## Bunch of utility functions
 
 def sign(x):
@@ -424,8 +424,8 @@ class JoyTeleop(Node):
         if not self.emergency_reachy.is_connected:
             exit("Reachy is not connected.")
         
-        self.emergency_reachy.mobile_base._set_drive_mode("cmd_vel")
-        self.emergency_reachy.mobile_base.reset_odometry()
+        # self.emergency_reachy.mobile_base._set_drive_mode("cmd_vel")
+        # self.emergency_reachy.mobile_base.reset_odometry()
         self.emergency_reachy.turn_on()
         self.emergency_reachy.head.r_antenna.turn_on()
         self.emergency_reachy.head.l_antenna.turn_on()
@@ -470,6 +470,10 @@ class JoyTeleop(Node):
 
             while True:
                 time.sleep(0.01)  # Avoid busy waiting
+                reachy.head.l_antenna.goal_position = (self.prev_joy2 + 1)*MAX_ANTENNA_ANGLE
+                reachy.head.r_antenna.goal_position = (self.prev_joy5 + 1)*MAX_ANTENNA_ANGLE
+                reachy.send_goal_positions(check_positions=False)
+                print(f"antenna L, R: {reachy.head.l_antenna.goal_position}, {reachy.head.r_antenna.goal_position}")
                 
                 with self.command_lock:
                     command = self.current_command
@@ -477,6 +481,8 @@ class JoyTeleop(Node):
 
                 if command is None:
                     continue
+                
+
 
                 # Execute the command
                 try:
@@ -565,12 +571,12 @@ class JoyTeleop(Node):
                     self.set_command("play_sweeting")
                 
             elif event.type == pygame.JOYAXISMOTION:
-                curr_joy2 = self.j.get_axis(2)
-                curr_joy5 = self.j.get_axis(5)
-                if curr_joy2 > 0 and self.prev_joy2 <= 0:
-                    self.emergency_shutdown()
-                if curr_joy5 > 0 and self.prev_joy5 <=0:
-                    pass
+                curr_joy2 = self.j.get_axis(2) # left (LT). -1 when not pressed, 1 when pressed
+                curr_joy5 = self.j.get_axis(5) # right (RT). -1 when not pressed, 1 when pressed
+                # if curr_joy2 > 0 and self.prev_joy2 <= 0:
+                #     self.emergency_shutdown()
+                # if curr_joy5 > 0 and self.prev_joy5 <=0:
+                #     pass
                 self.prev_joy2 = curr_joy2
                 self.prev_joy5 = curr_joy5
             
@@ -688,3 +694,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    

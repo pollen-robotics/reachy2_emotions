@@ -17,6 +17,8 @@ def main(ip: str, filename: str, freq: int):
         "r_arm": [],
         "r_hand": [],
         "head": [],
+        "l_antenna": [],
+        "r_antenna": [],
     }
 
     input("Press Enter to start the recording.")
@@ -31,6 +33,8 @@ def main(ip: str, filename: str, freq: int):
             head = reachy.head.get_current_positions()
             l_hand = reachy.l_arm.gripper.get_current_opening()
             r_hand = reachy.r_arm.gripper.get_current_opening()
+            l_antenna = reachy.head.l_antenna.present_position
+            r_antenna = reachy.head.r_antenna.present_position
 
             data["time"].append(time.time() - t0)
             data["l_arm"].append(l_arm)
@@ -38,11 +42,15 @@ def main(ip: str, filename: str, freq: int):
             data["r_arm"].append(r_arm)
             data["r_hand"].append(r_hand)
             data["head"].append(head)
+            data["l_antenna"].append(l_antenna)
+            data["r_antenna"].append(r_antenna)
 
             time.sleep(1 / freq)
 
     except KeyboardInterrupt:
-        file_path = os.path.join("recordings", filename)
+        directory = "recordings"
+        os.makedirs(directory, exist_ok=True)
+        file_path = os.path.join(directory, filename)
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
         print(
