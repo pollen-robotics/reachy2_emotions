@@ -476,7 +476,7 @@ class JoyTeleop(Node):
                 # reachy.head.l_antenna.goal_position = (self.prev_joy2 + 1)*MAX_ANTENNA_ANGLE
                 # reachy.head.r_antenna.goal_position = (self.prev_joy5 + 1)*MAX_ANTENNA_ANGLE
                 # joy
-                reachy.head.l_antenna.goal_position = (self.left_joy)*MAX_ANTENNA_ANGLE
+                reachy.head.l_antenna.goal_position = -(self.left_joy)*MAX_ANTENNA_ANGLE
                 reachy.head.r_antenna.goal_position = (self.right_joy)*MAX_ANTENNA_ANGLE
                 reachy.send_goal_positions(check_positions=False)
                 # print(f"antenna L, R: {reachy.head.l_antenna.goal_position}, {reachy.head.r_antenna.goal_position}")
