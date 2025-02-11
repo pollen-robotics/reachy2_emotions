@@ -88,10 +88,11 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
         os.makedirs(directory, exist_ok=True)
 
         # Save motion data to JSON file
-        file_path = os.path.join(directory, filename)
+        full_filename = filename + ".json"
+        file_path = os.path.join(directory, full_filename)
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
-        print(f"Robot motion data saved to {filename}.")
+        print(f"Robot motion data saved to {full_filename}.")
         print(f"Time of recording: {time.time() - t0:.2f} seconds")
 
         # Save recorded audio to a WAV file.
