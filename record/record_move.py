@@ -51,7 +51,7 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
         print(sd.query_devices())
         return
 
-    input("Press Enter to start the recording (robot motions and audio).")
+    #input("Press Enter to start the recording (robot motions and audio).")
 
     try:
         t0 = time.time()
