@@ -167,6 +167,7 @@ def main(ip: str, filename: Optional[str], audio_device: Optional[str], audio_of
 
             # Maintain the same timeframe between frames.
             left_time = timeframe - (time.time() - t0 - start_t)
+            print(f"left_time: {left_time*1000:.2f} ms")
             if left_time > 0:
                 time.sleep(left_time)
         else:
