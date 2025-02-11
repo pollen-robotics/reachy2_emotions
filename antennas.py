@@ -432,17 +432,18 @@ class JoyTeleop():
                         )
                     )
                 if self.j.get_button(5):  # r1
-                    self.rot_speed_ratio = max(0.0, self.rot_speed_ratio - 0.2)
-                    print(
-                        "max translational speed: {:.1f}m/s, max rotational speed: {:.1f}rad/s".format(
-                            self.lin_speed_ratio * 100, self.rot_speed_ratio * 100
-                        )
-                    )
+                    self.start_vibration()
+                    
+                    # self.rot_speed_ratio = max(0.0, self.rot_speed_ratio - 0.2)
+                    # print(
+                    #     "max translational speed: {:.1f}m/s, max rotational speed: {:.1f}rad/s".format(
+                    #         self.lin_speed_ratio * 100, self.rot_speed_ratio * 100
+                    #     )
+                    # )
                 if self.j.get_button(3):  # Y
                     self.set_command("play_hello")
                 if self.j.get_button(2):  # X
-                    # self.set_command("play_check_grippers")
-                    self.start_vibration()
+                    self.set_command("play_check_grippers")
                 if self.j.get_button(0):  # A
                     self.set_command("play_discover")
                 if self.j.get_button(1):
@@ -542,6 +543,7 @@ class JoyTeleop():
     def main_tick(self):
         # print("Tick!!")
         self.tick_controller()
+        # self.print_controller()
 
 
 def main():
