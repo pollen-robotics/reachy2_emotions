@@ -93,7 +93,7 @@ def main(ip: str, filename: Optional[str], audio_device: Optional[str], audio_of
         filename = get_last_recording(folder)
         path = os.path.join(folder, filename)
     else:
-        path = filename
+        path = filename+".json"
 
     data, timeframe = load_data(path)
 
