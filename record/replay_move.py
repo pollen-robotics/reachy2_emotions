@@ -27,6 +27,14 @@ RECORD_FOLDER = "recordings"
 # ------------------------------------------------------------------------------
 # Helper functions
 
+def interruptible_sleep(duration: float, stop_event: threading.Event):
+    """Sleep in small increments while checking if stop_event is set."""
+    end_time = time.time() + duration
+    while time.time() < end_time:
+        if stop_event.is_set():
+            break
+        time.sleep(0.01)
+
 def list_available_emotions(folder: str) -> list:
     """
     List all available emotions based on the JSON files in the folder.
@@ -82,8 +90,37 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
     return np.max([distance_l_arm, distance_r_arm])
 
 
+# def play_audio(audio_file: str, audio_device: Optional[str],
+#                start_event: threading.Event, audio_offset: float, stop_event: threading.Event):
+#     """
+#     Load the recorded audio file and wait for a common start trigger.
+#     If audio_offset is positive, delay playback; if negative, start immediately.
+#     """
+#     try:
+#         data, sample_rate = sf.read(audio_file, dtype="float32")
+#         if sample_rate != 44100:
+#             logging.warning("Recorded sample rate (%s) differs from default (44100).", sample_rate)
+#         logging.info("Audio thread ready. Waiting for start trigger...")
+#         # Replace blocking wait with an interruptible loop.
+#         while not start_event.is_set():
+#             if stop_event.is_set():
+#                 return
+#             time.sleep(0.01)
+#         if audio_offset > 0:
+#             logging.info("Delaying audio playback for %s seconds.", audio_offset)
+#             interruptible_sleep(audio_offset, stop_event)
+#         if stop_event.is_set():
+#             return
+#         logging.info("Starting audio playback on device: %s", audio_device)
+#         sd.play(data, samplerate=sample_rate, device=audio_device, latency='low')
+#         sd.wait() # TODO I think this is not interuptable :/
+#         logging.info("Audio playback finished.")
+#     except Exception as e:
+#         logging.error("Error during audio playback: %s", e)
+#         logging.info("Available audio devices: %s", sd.query_devices())
+
 def play_audio(audio_file: str, audio_device: Optional[str],
-               start_event: threading.Event, audio_offset: float):
+               start_event: threading.Event, audio_offset: float, stop_event: threading.Event):
     """
     Load the recorded audio file and wait for a common start trigger.
     If audio_offset is positive, delay playback; if negative, start immediately.
@@ -93,13 +130,32 @@ def play_audio(audio_file: str, audio_device: Optional[str],
         if sample_rate != 44100:
             logging.warning("Recorded sample rate (%s) differs from default (44100).", sample_rate)
         logging.info("Audio thread ready. Waiting for start trigger...")
-        start_event.wait()
+        # Replace blocking wait with an interruptible loop.
+        while not start_event.is_set():
+            if stop_event.is_set():
+                return
+            time.sleep(0.01)
+        logging.info("Start trigger received in audio thread.")
         if audio_offset > 0:
             logging.info("Delaying audio playback for %s seconds.", audio_offset)
-            time.sleep(audio_offset)
+            interruptible_sleep(audio_offset, stop_event)
+        if stop_event.is_set():
+            return
         logging.info("Starting audio playback on device: %s", audio_device)
         sd.play(data, samplerate=sample_rate, device=audio_device, latency='low')
-        sd.wait()
+        
+        # Compute the duration of the audio in seconds.
+        duration = len(data) / sample_rate
+        logging.info("Audio playback duration: %.3f seconds", duration)
+        start_time = time.time()
+        # Instead of sd.wait(), use an interruptible loop.
+        while (time.time() - start_time) < duration:
+            if stop_event.is_set():
+                logging.info("Audio playback interrupted during wait loop.")
+                sd.stop()
+                return
+            time.sleep(0.01)
+        sd.stop()
         logging.info("Audio playback finished.")
     except Exception as e:
         logging.error("Error during audio playback: %s", e)
@@ -125,6 +181,12 @@ class EmotionPlayer:
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
+        # Create the Reachy instance once here.
+        try:
+            self.reachy = ReachySDK(host=self.ip)
+        except Exception as e:
+            logging.error("Error connecting to Reachy in constructor: %s", e)
+            self.reachy = None
     
     def play_emotion(self, filename: str):
         """
@@ -134,15 +196,14 @@ class EmotionPlayer:
         with self.lock:
             self.stop()  # Stop current playback if any.
             self.stop_event.clear()
+            time.sleep(1.0)
             self.thread = threading.Thread(target=self._replay_thread, args=(filename,))
             self.thread.start()
     
     def _replay_thread(self, filename: str):
         logging.info("Starting emotion playback for %s", filename)
-        try:
-            reachy = ReachySDK(host=self.ip)
-        except Exception as e:
-            logging.error("Error connecting to Reachy: %s", e)
+        if self.reachy is None:
+            logging.error("No valid Reachy instance available.")
             return
         # Build full path to the recording.
         if not filename.endswith(".json"):
@@ -167,20 +228,21 @@ class EmotionPlayer:
         
         # Check current positions to adapt the duration of the initial move.
         try:
-            max_dist = distance_with_new_pose(reachy, data)
+            max_dist = distance_with_new_pose(self.reachy, data)
         except Exception as e:
             logging.error("Error computing distance: %s", e)
             max_dist = 0
         # first_duration = max_dist * 10 if max_dist > 0.2 else 2 # TODO: do better
+        # For now we set a fixed short duration.
         first_duration = 0.5
         
         start_event = threading.Event()
-        audio_thread = None
+        self.audio_thread = None
         if audio_available:
-            audio_thread = threading.Thread(target=play_audio,
+            self.audio_thread = threading.Thread(target=play_audio,
                                             args=(audio_file, self.audio_device,
-                                                  start_event, self.audio_offset))
-            audio_thread.start()
+                                                  start_event, self.audio_offset, self.stop_event))
+            self.audio_thread.start()
         
         if not self.auto_start:
             input("Is Reachy ready to move? Press Enter to continue.")
@@ -188,19 +250,19 @@ class EmotionPlayer:
             logging.info("Auto-start mode: proceeding without user confirmation.")
         
         try:
-            reachy.turn_on()
-            reachy.head.r_antenna.turn_on()
-            reachy.head.l_antenna.turn_on()
+            self.reachy.turn_on()
+            self.reachy.head.r_antenna.turn_on()
+            self.reachy.head.l_antenna.turn_on()
         except Exception as e:
             logging.error("Error turning on Reachy: %s", e)
             return
         
         try:
-            reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
-            reachy.r_arm.goto(data["r_arm"][0], duration=first_duration)
-            reachy.l_arm.gripper.set_opening(data["l_hand"][0])
-            reachy.r_arm.gripper.set_opening(data["r_hand"][0])
-            reachy.head.goto(data["head"][0], duration=first_duration, wait=True)
+            self.reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
+            self.reachy.r_arm.goto(data["r_arm"][0], duration=first_duration)
+            self.reachy.l_arm.gripper.set_opening(data["l_hand"][0])
+            self.reachy.r_arm.gripper.set_opening(data["r_hand"][0])
+            self.reachy.head.goto(data["head"][0], duration=first_duration, wait=True)
             logging.info("First position reached.")
         except Exception as e:
             logging.error("Error moving to initial position: %s", e)
@@ -211,7 +273,10 @@ class EmotionPlayer:
         if self.audio_offset < 0:
             wait_time = abs(self.audio_offset)
             logging.info("Waiting %s seconds before starting motion replay to allow audio to lead.", wait_time)
-            time.sleep(wait_time)
+            interruptible_sleep(wait_time, self.stop_event)
+            if self.stop_event.is_set():
+                logging.info("Emotion playback interrupted during audio lead wait.")
+                return
         
         t0 = time.time()
         try:
@@ -222,40 +287,49 @@ class EmotionPlayer:
                 start_t = time.time() - t0
 
                 # Update joint goals.
-                for joint, goal in zip(reachy.l_arm.joints.values(), data["l_arm"][ite]):
+                for joint, goal in zip(self.reachy.l_arm.joints.values(), data["l_arm"][ite]):
                     joint.goal_position = goal
-                for joint, goal in zip(reachy.r_arm.joints.values(), data["r_arm"][ite]):
+                for joint, goal in zip(self.reachy.r_arm.joints.values(), data["r_arm"][ite]):
                     joint.goal_position = goal
-                for joint, goal in zip(reachy.head.joints.values(), data["head"][ite]):
+                for joint, goal in zip(self.reachy.head.joints.values(), data["head"][ite]):
                     joint.goal_position = goal
 
-                reachy.l_arm.gripper.goal_position = data["l_hand"][ite]
-                reachy.r_arm.gripper.goal_position = data["r_hand"][ite]
-                reachy.head.l_antenna.goal_position = data["l_antenna"][ite]
-                reachy.head.r_antenna.goal_position = data["r_antenna"][ite]
+                self.reachy.l_arm.gripper.goal_position = data["l_hand"][ite]
+                self.reachy.r_arm.gripper.goal_position = data["r_hand"][ite]
+                self.reachy.head.l_antenna.goal_position = data["l_antenna"][ite]
+                self.reachy.head.r_antenna.goal_position = data["r_antenna"][ite]
 
-                reachy.send_goal_positions(check_positions=False)
+                self.reachy.send_goal_positions(check_positions=False)
 
                 left_time = timeframe - (time.time() - t0 - start_t)
                 logging.info("left_time: %.2f ms", left_time * 1000)
                 if left_time > 0:
-                    time.sleep(left_time)
+                    interruptible_sleep(left_time, self.stop_event)
+                    if self.stop_event.is_set():
+                        logging.info("Emotion playback interrupted during sleep.")
+                        break
             else:
                 logging.info("End of the recording. Replay duration: %.2f seconds", time.time() - t0)
         except Exception as e:
             logging.error("Error during replay: %s", e)
         finally:
-            if audio_thread and audio_thread.is_alive():
+            if self.audio_thread and self.audio_thread.is_alive():
                 sd.stop()
-                audio_thread.join()
+                self.audio_thread.join()
     
     def stop(self):
         if self.thread and self.thread.is_alive():
             logging.info("Stopping current emotion playback.")
             self.stop_event.set()
-            sd.stop()  # Stop any audio playback immediately.
+            time.sleep(0.1)
+            logging.info("Calling stop()")
+            
+            
+            logging.info("calling join()")
             self.thread.join()
             self.thread = None
+            logging.info("stop() finished.")
+            
 
 
 # ------------------------------------------------------------------------------
@@ -264,7 +338,7 @@ class EmotionPlayer:
 def run_cli_mode(ip: str, filename: Optional[str],
                  audio_device: Optional[str], audio_offset: float):
     """
-    CLI mode (one-shot replay with confirmation).
+    CLI mode (one-shot replay).
     If filename is omitted, the most recent recording is used.
     """
     player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
