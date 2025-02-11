@@ -289,6 +289,7 @@ class JoyTeleop():
         self.min_joy_position = 0.03
         self.current_command = None
         self.command_lock = threading.Lock()
+        self.antenna_vibration_offset = 0.0
         
         self.emergency_reachy = ReachySDK(host="localhost")
 
@@ -330,6 +331,23 @@ class JoyTeleop():
         """Clear the current command, e.g., during an emergency stop."""
         with self.command_lock:
             self.current_command = None
+            
+    def _vibration_loop(self):
+        dur = 2
+        t = np.linspace(0, dur, dur * 100)
+        pos = 10 * np.sin(2 * np.pi * 5 * t)
+        
+        for p in pos:
+            self.antenna_vibration_offset = p
+            time.sleep(0.01)
+
+
+    def start_vibration(self):
+        """Starts the vibration thread if not already running."""
+        self._vibration_active = True
+        self._vibration_thread = threading.Thread(target=self._vibration_loop)
+        self._vibration_thread.daemon = True
+        self._vibration_thread.start()
 
 
     def run_reachy_sdk(self):
@@ -347,8 +365,8 @@ class JoyTeleop():
                 # reachy.head.l_antenna.goal_position = (self.prev_joy2 + 1)*MAX_ANTENNA_ANGLE
                 # reachy.head.r_antenna.goal_position = (self.prev_joy5 + 1)*MAX_ANTENNA_ANGLE
                 # joy
-                new_l = -(self.left_joy)*MAX_ANTENNA_ANGLE
-                new_r = (self.right_joy)*MAX_ANTENNA_ANGLE
+                new_l = -(self.left_joy)*MAX_ANTENNA_ANGLE - self.antenna_vibration_offset
+                new_r = (self.right_joy)*MAX_ANTENNA_ANGLE + self.antenna_vibration_offset
                 if abs(new_l - reachy.head.l_antenna.goal_position) > 0.1 or abs(new_r - reachy.head.r_antenna.goal_position) > 0.1:  
                     reachy.head.l_antenna.goal_position = new_l
                     reachy.head.r_antenna.goal_position = new_r
@@ -423,7 +441,8 @@ class JoyTeleop():
                 if self.j.get_button(3):  # Y
                     self.set_command("play_hello")
                 if self.j.get_button(2):  # X
-                    self.set_command("play_check_grippers")
+                    # self.set_command("play_check_grippers")
+                    self.start_vibration()
                 if self.j.get_button(0):  # A
                     self.set_command("play_discover")
                 if self.j.get_button(1):

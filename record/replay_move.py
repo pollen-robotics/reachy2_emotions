@@ -122,6 +122,8 @@ def main(ip: str, filename: Optional[str], audio_device: Optional[str], audio_of
 
     input("Is Reachy ready to move? Press Enter to continue.")
     reachy.turn_on()
+    reachy.head.r_antenna.turn_on()
+    reachy.head.l_antenna.turn_on()
 
     # Move Reachy to the initial recorded position.
     reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
