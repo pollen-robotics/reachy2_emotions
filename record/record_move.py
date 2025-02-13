@@ -6,6 +6,7 @@ import time
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
+import threading  # Added for scheduling the beep
 
 from reachy2_sdk import ReachySDK  # type: ignore
 
@@ -51,7 +52,16 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
         print(sd.query_devices())
         return
 
-    #input("Press Enter to start the recording (robot motions and audio).")
+    # --- Schedule a beep sound 1 second after start ---
+    def beep():
+        duration = 0.2       # Beep duration in seconds
+        freq_beep = 440      # Frequency in Hz
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        beep_sound = 0.5 * np.sin(2 * np.pi * freq_beep * t)
+        sd.play(beep_sound, sample_rate)
+        sd.wait()  # Wait until the beep finishes playing
+
+    threading.Timer(1.5, beep).start()
 
     try:
         t0 = time.time()
