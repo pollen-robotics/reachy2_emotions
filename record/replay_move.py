@@ -10,6 +10,7 @@ import soundfile as sf
 import logging
 from typing import Optional, Tuple
 from reachy2_sdk import ReachySDK  # type: ignore
+import bisect
 
 # For the Flask server mode:
 from flask import Flask, request, jsonify
@@ -26,6 +27,10 @@ RECORD_FOLDER = "recordings"
 
 # ------------------------------------------------------------------------------
 # Helper functions
+
+def lerp(v0, v1, alpha):
+    """Linear interpolation between two values."""
+    return v0 + alpha * (v1 - v0)
 
 def interruptible_sleep(duration: float, stop_event: threading.Event):
     """Sleep in small increments while checking if stop_event is set."""
@@ -277,38 +282,72 @@ class EmotionPlayer:
             if self.stop_event.is_set():
                 logging.info("Emotion playback interrupted during audio lead wait.")
                 return
-        
+        dt = 1/100.0
         t0 = time.time()
         try:
-            for ite in range(len(data["time"])):
-                if self.stop_event.is_set():
-                    logging.info("Emotion playback interrupted.")
+            while not self.stop_event.is_set():
+                current_time = time.time() - t0  # elapsed time since playback started
+
+                # If we've reached or passed the last recorded time, use the final positions.
+                if current_time >= data["time"][-1]:
+                    logging.info("Reached end of recording; setting final positions.")
+                    # Set final positions for each component:
+                    for joint, goal in zip(self.reachy.l_arm.joints.values(), data["l_arm"][-1]):
+                        joint.goal_position = goal
+                    for joint, goal in zip(self.reachy.r_arm.joints.values(), data["r_arm"][-1]):
+                        joint.goal_position = goal
+                    for joint, goal in zip(self.reachy.head.joints.values(), data["head"][-1]):
+                        joint.goal_position = goal
+
+                    self.reachy.l_arm.gripper.goal_position = data["l_hand"][-1]
+                    self.reachy.r_arm.gripper.goal_position = data["r_hand"][-1]
+                    self.reachy.head.l_antenna.goal_position = data["l_antenna"][-1]
+                    self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
+
+                    self.reachy.send_goal_positions(check_positions=False)
                     break
-                start_t = time.time() - t0
 
-                # Update joint goals.
-                for joint, goal in zip(self.reachy.l_arm.joints.values(), data["l_arm"][ite]):
-                    joint.goal_position = goal
-                for joint, goal in zip(self.reachy.r_arm.joints.values(), data["r_arm"][ite]):
-                    joint.goal_position = goal
-                for joint, goal in zip(self.reachy.head.joints.values(), data["head"][ite]):
-                    joint.goal_position = goal
+                # Locate the right interval in the recorded time array.
+                # 'index' is the insertion point which gives us the next timestamp.
+                index = bisect.bisect_right(data["time"], current_time)
+                logging.info(f"index: {index}, expected index: {current_time/dt}")
+                idx_prev = index - 1 if index > 0 else 0
+                idx_next = index if index < len(data["time"]) else idx_prev
 
-                self.reachy.l_arm.gripper.goal_position = data["l_hand"][ite]
-                self.reachy.r_arm.gripper.goal_position = data["r_hand"][ite]
-                self.reachy.head.l_antenna.goal_position = data["l_antenna"][ite]
-                self.reachy.head.r_antenna.goal_position = data["r_antenna"][ite]
+                t_prev = data["time"][idx_prev]
+                t_next = data["time"][idx_next]
 
+                # Avoid division by zero (if by any chance two timestamps are identical).
+                if t_next == t_prev:
+                    alpha = 0.0
+                else:
+                    alpha = (current_time - t_prev) / (t_next - t_prev)
+
+                # Interpolate positions for each joint in left arm, right arm, and head.
+                for joint, pos_prev, pos_next in zip(self.reachy.l_arm.joints.values(), data["l_arm"][idx_prev], data["l_arm"][idx_next]):
+                    joint.goal_position = lerp(pos_prev, pos_next, alpha)
+                for joint, pos_prev, pos_next in zip(self.reachy.r_arm.joints.values(), data["r_arm"][idx_prev], data["r_arm"][idx_next]):
+                    joint.goal_position = lerp(pos_prev, pos_next, alpha)
+                for joint, pos_prev, pos_next in zip(self.reachy.head.joints.values(), data["head"][idx_prev], data["head"][idx_next]):
+                    joint.goal_position = lerp(pos_prev, pos_next, alpha)
+
+                # Similarly interpolate for grippers and antennas.
+                self.reachy.l_arm.gripper.goal_position = lerp(data["l_hand"][idx_prev], data["l_hand"][idx_next], alpha)
+                self.reachy.r_arm.gripper.goal_position = lerp(data["r_hand"][idx_prev], data["r_hand"][idx_next], alpha)
+                self.reachy.head.l_antenna.goal_position = lerp(data["l_antenna"][idx_prev], data["l_antenna"][idx_next], alpha)
+                self.reachy.head.r_antenna.goal_position = lerp(data["r_antenna"][idx_prev], data["r_antenna"][idx_next], alpha)
+
+                # Send the updated positions to the robot.
                 self.reachy.send_goal_positions(check_positions=False)
 
-                left_time = timeframe - (time.time() - t0 - start_t)
-                logging.info("left_time: %.2f ms", left_time * 1000)
-                if left_time > 0:
-                    interruptible_sleep(left_time, self.stop_event)
-                    if self.stop_event.is_set():
-                        logging.info("Emotion playback interrupted during sleep.")
-                        break
-            else:
+                calculation_duration = time.time() - t0 - current_time
+                margin = dt - calculation_duration
+                if margin > 0:
+                    time.sleep(margin)
+                
+                # logging.info(f"dt: {dt*1000:.0f}, calculation_duration: {calculation_duration*1000:.0f}, margin: {margin*1000:.0f}")
+                                    
+            else :
                 logging.info("End of the recording. Replay duration: %.2f seconds", time.time() - t0)
         except Exception as e:
             logging.error("Error during replay: %s", e)
