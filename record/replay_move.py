@@ -11,6 +11,17 @@ import logging
 from typing import Optional, Tuple
 from reachy2_sdk import ReachySDK  # type: ignore
 import bisect
+import numpy.typing as npt
+from google.protobuf.wrappers_pb2 import FloatValue, Int32Value
+from reachy2_sdk_api.arm_pb2 import (
+    ArmCartesianGoal,
+    IKConstrainedMode,
+    IKContinuousMode,
+)
+from reachy2_sdk_api.kinematics_pb2 import Matrix4x4
+from scipy.spatial.transform import Rotation as R
+
+from reachy2_symbolic_ik.utils import make_homogenous_matrix_from_rotation_matrix
 
 # For the Flask server mode:
 from flask import Flask, request, jsonify
@@ -23,6 +34,15 @@ logging.basicConfig(level=logging.INFO,
 
 # Folder with recordings (JSON + corresponding WAV files)
 RECORD_FOLDER = "recordings"
+
+"""
+TODOs
+- Initial head goto sometimes fails because it's unreachable??    
+- reachy turn on fails and is super long (5s) ??
+- Handle 1.5 start duration ? Why does it work??
+    
+"""
+
 
 
 # ------------------------------------------------------------------------------
@@ -94,36 +114,6 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
 
     return np.max([distance_l_arm, distance_r_arm])
 
-
-# def play_audio(audio_file: str, audio_device: Optional[str],
-#                start_event: threading.Event, audio_offset: float, stop_event: threading.Event):
-#     """
-#     Load the recorded audio file and wait for a common start trigger.
-#     If audio_offset is positive, delay playback; if negative, start immediately.
-#     """
-#     try:
-#         data, sample_rate = sf.read(audio_file, dtype="float32")
-#         if sample_rate != 44100:
-#             logging.warning("Recorded sample rate (%s) differs from default (44100).", sample_rate)
-#         logging.info("Audio thread ready. Waiting for start trigger...")
-#         # Replace blocking wait with an interruptible loop.
-#         while not start_event.is_set():
-#             if stop_event.is_set():
-#                 return
-#             time.sleep(0.01)
-#         if audio_offset > 0:
-#             logging.info("Delaying audio playback for %s seconds.", audio_offset)
-#             interruptible_sleep(audio_offset, stop_event)
-#         if stop_event.is_set():
-#             return
-#         logging.info("Starting audio playback on device: %s", audio_device)
-#         sd.play(data, samplerate=sample_rate, device=audio_device, latency='low')
-#         sd.wait() # TODO I think this is not interuptable :/
-#         logging.info("Audio playback finished.")
-#     except Exception as e:
-#         logging.error("Error during audio playback: %s", e)
-#         logging.info("Available audio devices: %s", sd.query_devices())
-
 def play_audio(audio_file: str, audio_device: Optional[str],
                start_event: threading.Event, audio_offset: float, stop_event: threading.Event):
     """
@@ -189,9 +179,22 @@ class EmotionPlayer:
         # Create the Reachy instance once here.
         try:
             self.reachy = ReachySDK(host=self.ip)
+            
         except Exception as e:
             logging.error("Error connecting to Reachy in constructor: %s", e)
             self.reachy = None
+            exit(1)
+        try:
+            logging.info("Turn on reachy")
+            self.reachy.turn_on()
+            logging.info("Turn on antennas")
+            
+            self.reachy.head.r_antenna.turn_on()
+            self.reachy.head.l_antenna.turn_on()
+            logging.info("Turn on done")   
+        except Exception as e:
+            logging.error("Error turning on Reachy: %s", e)
+            return
     
     def play_emotion(self, filename: str):
         """
@@ -256,24 +259,17 @@ class EmotionPlayer:
         else:
             logging.info("Auto-start mode: proceeding without user confirmation.")
         
-        try:
-            self.reachy.turn_on()
-            self.reachy.head.r_antenna.turn_on()
-            self.reachy.head.l_antenna.turn_on()
-        except Exception as e:
-            logging.error("Error turning on Reachy: %s", e)
-            return
-        
-        try:
-            self.reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
-            self.reachy.r_arm.goto(data["r_arm"][0], duration=first_duration)
-            self.reachy.l_arm.gripper.set_opening(data["l_hand"][0])
-            self.reachy.r_arm.gripper.set_opening(data["r_hand"][0])
-            self.reachy.head.goto(data["head"][0], duration=first_duration, wait=True)
-            logging.info("First position reached.")
-        except Exception as e:
-            logging.error("Error moving to initial position: %s", e)
-            return
+        # try:
+        #     self.reachy.l_arm.goto(data["l_arm"][0], duration=first_duration)
+        #     self.reachy.r_arm.goto(data["r_arm"][0], duration=first_duration)
+        #     self.reachy.l_arm.gripper.set_opening(data["l_hand"][0])
+        #     self.reachy.r_arm.gripper.set_opening(data["r_hand"][0])
+        #     self.reachy.head.goto(data["head"][0], duration=first_duration) # not using wait=true because it backfires if unreachable
+        #     time.sleep(first_duration)
+        #     logging.info("First position reached.")
+        # except Exception as e:
+        #     logging.error("Error moving to initial position: %s", e)
+        #     return
         
         start_event.set()
         
@@ -286,9 +282,11 @@ class EmotionPlayer:
                 return
         dt = 1/100.0
         t0 = time.time()
+        # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
+        playback_offset = 0.0 # TODO Why does putting 1.6 here makes it work that bad ?
         try:
             while not self.stop_event.is_set():
-                current_time = time.time() - t0  # elapsed time since playback started
+                current_time = time.time() - t0  + playback_offset# elapsed time since playback started
 
                 # If we've reached or passed the last recorded time, use the final positions.
                 if current_time >= data["time"][-1]:
