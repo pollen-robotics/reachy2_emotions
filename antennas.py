@@ -65,8 +65,11 @@ CTRL-C  or press CIRCLE on the controller to quit
 # These are integer values between 0 and 100
 TORQUE_LIMIT=100
 SPEED_LIMIT=100
-MAX_ANTENNA_ANGLE = 130 # to be checked
+MAX_ANTENNA_ANGLE = 110 # to be checked
 ## Bunch of utility functions
+
+# IP_ADDRESS = "localhost"
+IP_ADDRESS = "192.168.50.218"
 
 def sign(x):
     if x >= 0:
@@ -291,7 +294,7 @@ class JoyTeleop():
         self.command_lock = threading.Lock()
         self.antenna_vibration_offset = 0.0
         
-        self.emergency_reachy = ReachySDK(host="localhost")
+        self.emergency_reachy = ReachySDK(host=IP_ADDRESS)
 
         if not self.emergency_reachy.is_connected:
             exit("Reachy is not connected.")
@@ -353,7 +356,7 @@ class JoyTeleop():
     def run_reachy_sdk(self):
         """Thread for managing ReachySDK client."""
         try:
-            reachy = ReachySDK(host="localhost")
+            reachy = ReachySDK(host=IP_ADDRESS)
 
             if not reachy.is_connected:
                 exit("Reachy is not connected.")
