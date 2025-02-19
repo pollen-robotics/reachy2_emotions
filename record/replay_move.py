@@ -237,9 +237,11 @@ class EmotionPlayer:
         except Exception as e:
             logging.error("Error computing distance: %s", e)
             max_dist = 0
-        # first_duration = max_dist * 10 if max_dist > 0.2 else 2 # TODO: do better
+        first_duration = max_dist * 5 # TODO: do better
+        if first_duration > 1.0:
+            first_duration = 1.0
         # For now we set a fixed short duration.
-        first_duration = 0.5
+        # first_duration = 0.5
         
         start_event = threading.Event()
         self.audio_thread = None
@@ -305,6 +307,8 @@ class EmotionPlayer:
                     self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
 
                     self.reachy.send_goal_positions(check_positions=False)
+                    logging.info(f"Reached end of recording normally")
+                    
                     break
 
                 # Locate the right interval in the recorded time array.
@@ -352,9 +356,12 @@ class EmotionPlayer:
         except Exception as e:
             logging.error("Error during replay: %s", e)
         finally:
+            logging.info(f"Finally of replay. if self.audio_thread and self.audio_thread.is_alive() = {self.audio_thread and self.audio_thread.is_alive()}")
             if self.audio_thread and self.audio_thread.is_alive():
-                sd.stop()
+                # sd.stop()
                 self.audio_thread.join()
+            logging.info(f"Endend Finally of replay")
+            
     
     def stop(self):
         if self.thread and self.thread.is_alive():
@@ -368,6 +375,8 @@ class EmotionPlayer:
             self.thread.join()
             self.thread = None
             logging.info("stop() finished.")
+        else:
+            logging.info("No active playback to stop.")
             
 
 
@@ -402,7 +411,10 @@ def run_server_mode(ip: str, audio_device: Optional[str],
     """
     player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
     # allowed_emotions = list_available_emotions(RECORD_FOLDER) # disabled since we have some bad recordings
-    allowed_emotions = ["attentif1", "attentif2", "accueillant", "non_triste1", "oui_triste2", "frustration", "oui_triste1", "oui_excite2", "accueillant2", "oui_excite1", "non_triste2", "non_excite2", "oui_excite3", "amical1", "accueillant3", "non_excite1", "incertain2", "reconnaissant2"]
+    # allowed_emotions = ["attentif1", "attentif2", "accueillant", "non_triste1", "oui_triste2", "frustration", "oui_triste1", "oui_excite2", "accueillant2", "oui_excite1", "non_triste2", "non_excite2", "oui_excite3", "amical1", "accueillant3", "non_excite1", "incertain2", "reconnaissant2"]
+    allowed_emotions = ["dodo1", "ecoute2", "fatigue1", "ecoute1", "macarena1", "curieux1", "solitaire1", "ennui2", "fatigue2", "furieux2", "ennui1", "apaisant1", "timide1", "anxiete1", "perdu1", "triste1", "abattu1", "furieux1", "attentif1", "enthousiaste2", "enthousiaste3", "attentif2", "confus1", "penseur1", "oui_triste1", "fier1", "frustre1", "incertain1", "enthousiaste1", "serenite1", "aimant1", "serenite2", "impatient1", "serviable2", "degoute1", "accueillant1", "enjoue1", "mecontent1", "peur2", "mecontent2", "interrogatif2", "non_triste1", "incomprehensif1", "reconnaissant1", "rieur1", "soulagement1", "comprehension1", "enerve2", "impatient2", "non", "serviable1", "patient1", "oui1", "enerve1", "frustre2", "mepris1", "amical1", "non_excite1", "etonne1", "fier2", "emerveille1", "oui_excite1", "resigne1", "interrogatif1", "oups1", "peur1", "surpris1", "rieur2", "comprehension2", "celebrant1"]
+
+    
     logging.info("Available emotions: %s", allowed_emotions)
     
     app = Flask(__name__)

@@ -87,7 +87,7 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
             data["l_antenna"].append(l_antenna)
             data["r_antenna"].append(r_antenna)
 
-            time.sleep(1 / freq)
+            time.sleep(1 / freq) # TODO should be adjusted to match the desired frequency
     except KeyboardInterrupt:
         # Stop the audio stream
         audio_stream.stop()
