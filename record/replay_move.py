@@ -303,6 +303,43 @@ class EmotionPlayer:
                     self.reachy.send_goal_positions(check_positions=False)
                     logging.info(f"Reached end of recording normally")
                     
+                    # TODO iterate over this idea
+                    # logging.info(f"Starting IDLE")
+                    
+                    # # Capture the final positions as a reference.
+                    # idle_final_positions = {
+                    #     "l_arm": {name: joint.goal_position for name, joint in self.reachy.l_arm.joints.items()},
+                    #     "r_arm": {name: joint.goal_position for name, joint in self.reachy.r_arm.joints.items()},
+                    #     "head": {name: joint.goal_position for name, joint in self.reachy.head.joints.items()},
+                    #     "l_hand": self.reachy.l_arm.gripper.goal_position,
+                    #     "r_hand": self.reachy.r_arm.gripper.goal_position,
+                    #     "l_antenna": self.reachy.head.l_antenna.goal_position,
+                    #     "r_antenna": self.reachy.head.r_antenna.goal_position,
+                    # }
+                    
+                    # # Idle loop parameters (adjust as needed)
+                    # idle_update_interval = 0.02  # seconds between updates
+                    # idle_amplitude = 0.02       # maximum random offset
+
+                    # while not self.stop_event.is_set():
+                    #     for name, joint in self.reachy.l_arm.joints.items():
+                    #         jitter = np.random.uniform(-idle_amplitude, idle_amplitude)
+                    #         joint.goal_position = idle_final_positions["l_arm"][name] + jitter
+                    #     for name, joint in self.reachy.r_arm.joints.items():
+                    #         jitter = np.random.uniform(-idle_amplitude, idle_amplitude)
+                    #         joint.goal_position = idle_final_positions["r_arm"][name] + jitter
+                    #     for name, joint in self.reachy.head.joints.items():
+                    #         jitter = np.random.uniform(-idle_amplitude, idle_amplitude)
+                    #         joint.goal_position = idle_final_positions["head"][name] + jitter
+
+                    #     self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + np.random.uniform(-idle_amplitude, idle_amplitude)
+                    #     self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + np.random.uniform(-idle_amplitude, idle_amplitude)
+                    #     self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + np.random.uniform(-idle_amplitude, idle_amplitude)
+                    #     self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + np.random.uniform(-idle_amplitude, idle_amplitude)
+                        
+                    #     self.reachy.send_goal_positions(check_positions=False)
+                    #     time.sleep(idle_update_interval)
+                    
                     break
 
                 # Locate the right interval in the recorded time array.
