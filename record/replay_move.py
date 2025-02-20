@@ -93,7 +93,7 @@ def load_data(path: str) -> Tuple[dict, float]:
     logging.info("Data loaded from %s", path)
     if len(data["time"]) < 2:
         raise ValueError("Insufficient time data in the recording.")
-    timeframe = data["time"][1] - data["time"][0]
+    timeframe = (data["time"][-1] - data["time"][0])/len(data["time"])
     return data, timeframe
 
 
@@ -280,13 +280,15 @@ class EmotionPlayer:
             if self.stop_event.is_set():
                 logging.info("Emotion playback interrupted during audio lead wait.")
                 return
-        dt = 1/100.0
-        t0 = time.time()
+
+        dt = timeframe
         # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
-        playback_offset = 0.0 # TODO Why does putting 1.6 here makes it work that bad ?
+        playback_offset = 1.6
+        t0 = time.time() - playback_offset
+        
         try:
             while not self.stop_event.is_set():
-                current_time = time.time() - t0  + playback_offset# elapsed time since playback started
+                current_time = time.time() - t0 # elapsed time since playback started
 
                 # If we've reached or passed the last recorded time, use the final positions.
                 if current_time >= data["time"][-1]:
@@ -312,7 +314,7 @@ class EmotionPlayer:
                 # Locate the right interval in the recorded time array.
                 # 'index' is the insertion point which gives us the next timestamp.
                 index = bisect.bisect_right(data["time"], current_time)
-                logging.info(f"index: {index}, expected index: {current_time/dt}")
+                logging.info(f"index: {index}, expected index: {current_time/dt:.0f}")
                 idx_prev = index - 1 if index > 0 else 0
                 idx_next = index if index < len(data["time"]) else idx_prev
 
