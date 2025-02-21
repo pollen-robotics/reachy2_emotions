@@ -416,8 +416,8 @@ class EmotionPlayer:
                         self.reachy.send_goal_positions(check_positions=False)
                         time.sleep(dt)
 
-                    # End of idle loop.
-                    
+                        # End of idle loop.
+                    # End of play_emotion
                     break
 
                 # Locate the right interval in the recorded time array.
