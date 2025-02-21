@@ -268,12 +268,13 @@ class EmotionPlayer:
             logging.info("Auto-start mode: proceeding without user confirmation.")
         
         try:
-            self.reachy.l_arm.goto(data["l_arm"][0], duration=first_duration, interpolation_mode="linear")
-            self.reachy.r_arm.goto(data["r_arm"][0], duration=first_duration, interpolation_mode="linear")
-            self.reachy.l_arm.gripper.set_opening(data["l_hand"][0])
-            self.reachy.r_arm.gripper.set_opening(data["r_hand"][0])
-            self.reachy.head.goto(data["head"][0], duration=first_duration, interpolation_mode="linear") # not using wait=true because it backfires if unreachable
-            time.sleep(first_duration)
+            if first_duration > 0.0:
+                self.reachy.l_arm.goto(data["l_arm"][0], duration=first_duration, interpolation_mode="linear")
+                self.reachy.r_arm.goto(data["r_arm"][0], duration=first_duration, interpolation_mode="linear")
+                self.reachy.l_arm.gripper.set_opening(data["l_hand"][0])
+                self.reachy.r_arm.gripper.set_opening(data["r_hand"][0])
+                self.reachy.head.goto(data["head"][0], duration=first_duration, interpolation_mode="linear") # not using wait=true because it backfires if unreachable
+                time.sleep(first_duration)
             logging.info("First position reached.")
         except Exception as e:
             logging.error("Error moving to initial position: %s", e)
