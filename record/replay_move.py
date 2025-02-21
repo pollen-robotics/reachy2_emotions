@@ -184,7 +184,7 @@ class EmotionPlayer:
         self.audio_offset = audio_offset
         self.record_folder = record_folder
         self.auto_start = auto_start  # In server mode, auto_start is True (no prompt)
-        self.max_joint_speed = 90.0  # degrees per second
+        self.max_joint_speed = 30.0  # degrees per second
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -357,6 +357,7 @@ class EmotionPlayer:
                     idle_amplitude = 0.5        # maximum offset magnitude
                     idle_amplitude_antenna = 20.0
                     idle_amplitude_gripper = 10.0
+                    # Note : setting phase at 0 otherwise we have a discontinuity
 
                     # For each joint, assign a random frequency (Hz) and phase offset.
                     idle_params = {
@@ -369,17 +370,17 @@ class EmotionPlayer:
                                             ("head", self.reachy.head.joints)]:
                         for name in idle_final_positions[group]:
                             freq = np.random.uniform(0.1, 0.3)  # smooth oscillation (0.1-0.3 Hz)
-                            phase = np.random.uniform(0, 2 * np.pi)
+                            phase = 0.0#np.random.uniform(0, 2 * np.pi)
                             idle_params[group][name] = (freq, phase)
 
                     # Also assign parameters for grippers and antennas.
                     gripper_params = {
-                        "l_hand": (np.random.uniform(0.1, 0.3), np.random.uniform(0, 100.0)),
-                        "r_hand": (np.random.uniform(0.1, 0.3), np.random.uniform(0, 100.0))
+                        "l_hand": (np.random.uniform(0.1, 0.3),0.0),
+                        "r_hand": (np.random.uniform(0.1, 0.3), 0.0)
                     }
                     antenna_params = {
-                        "l_antenna": (np.random.uniform(0.1, 0.3), np.random.uniform(-30.0, 30.0)),
-                        "r_antenna": (np.random.uniform(0.1, 0.3), np.random.uniform(-30.0, 30.0))
+                        "l_antenna": (np.random.uniform(0.1, 0.3), 0.0),
+                        "r_antenna": (np.random.uniform(0.1, 0.3), 0.0)
                     }
 
                     idle_start_time = time.time()
