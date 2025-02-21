@@ -304,41 +304,83 @@ class EmotionPlayer:
                     logging.info(f"Reached end of recording normally")
                     
                     # TODO iterate over this idea
-                    # logging.info(f"Starting IDLE")
-                    
-                    # # Capture the final positions as a reference.
-                    # idle_final_positions = {
-                    #     "l_arm": {name: joint.goal_position for name, joint in self.reachy.l_arm.joints.items()},
-                    #     "r_arm": {name: joint.goal_position for name, joint in self.reachy.r_arm.joints.items()},
-                    #     "head": {name: joint.goal_position for name, joint in self.reachy.head.joints.items()},
-                    #     "l_hand": self.reachy.l_arm.gripper.goal_position,
-                    #     "r_hand": self.reachy.r_arm.gripper.goal_position,
-                    #     "l_antenna": self.reachy.head.l_antenna.goal_position,
-                    #     "r_antenna": self.reachy.head.r_antenna.goal_position,
-                    # }
-                    
-                    # # Idle loop parameters (adjust as needed)
-                    # idle_update_interval = 0.02  # seconds between updates
-                    # idle_amplitude = 0.02       # maximum random offset
+                    logging.info("Reached end of recording normally, starting idle motion.")
 
-                    # while not self.stop_event.is_set():
-                    #     for name, joint in self.reachy.l_arm.joints.items():
-                    #         jitter = np.random.uniform(-idle_amplitude, idle_amplitude)
-                    #         joint.goal_position = idle_final_positions["l_arm"][name] + jitter
-                    #     for name, joint in self.reachy.r_arm.joints.items():
-                    #         jitter = np.random.uniform(-idle_amplitude, idle_amplitude)
-                    #         joint.goal_position = idle_final_positions["r_arm"][name] + jitter
-                    #     for name, joint in self.reachy.head.joints.items():
-                    #         jitter = np.random.uniform(-idle_amplitude, idle_amplitude)
-                    #         joint.goal_position = idle_final_positions["head"][name] + jitter
+                    # Capture the final positions as a reference.
+                    idle_final_positions = {
+                        "l_arm": {name: joint.goal_position for name, joint in self.reachy.l_arm.joints.items()},
+                        "r_arm": {name: joint.goal_position for name, joint in self.reachy.r_arm.joints.items()},
+                        "head": {name: joint.goal_position for name, joint in self.reachy.head.joints.items()},
+                        "l_hand": self.reachy.l_arm.gripper.goal_position,
+                        "r_hand": self.reachy.r_arm.gripper.goal_position,
+                        "l_antenna": self.reachy.head.l_antenna.goal_position,
+                        "r_antenna": self.reachy.head.r_antenna.goal_position,
+                    }
 
-                    #     self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + np.random.uniform(-idle_amplitude, idle_amplitude)
-                    #     self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + np.random.uniform(-idle_amplitude, idle_amplitude)
-                    #     self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + np.random.uniform(-idle_amplitude, idle_amplitude)
-                    #     self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + np.random.uniform(-idle_amplitude, idle_amplitude)
-                        
-                    #     self.reachy.send_goal_positions(check_positions=False)
-                    #     time.sleep(idle_update_interval)
+                    # Define idle animation parameters.
+                    idle_amplitude = 0.5        # maximum offset magnitude
+                    idle_amplitude_antenna = 20.0
+                    idle_amplitude_gripper = 10.0
+
+                    # For each joint, assign a random frequency (Hz) and phase offset.
+                    idle_params = {
+                        "l_arm": {},
+                        "r_arm": {},
+                        "head": {}
+                    }
+                    for group, joints in [("l_arm", self.reachy.l_arm.joints),
+                                            ("r_arm", self.reachy.r_arm.joints),
+                                            ("head", self.reachy.head.joints)]:
+                        for name in idle_final_positions[group]:
+                            freq = np.random.uniform(0.1, 0.3)  # smooth oscillation (0.1-0.3 Hz)
+                            phase = np.random.uniform(0, 2 * np.pi)
+                            idle_params[group][name] = (freq, phase)
+
+                    # Also assign parameters for grippers and antennas.
+                    gripper_params = {
+                        "l_hand": (np.random.uniform(0.1, 0.3), np.random.uniform(0, 100.0)),
+                        "r_hand": (np.random.uniform(0.1, 0.3), np.random.uniform(0, 100.0))
+                    }
+                    antenna_params = {
+                        "l_antenna": (np.random.uniform(0.1, 0.3), np.random.uniform(-30.0, 30.0)),
+                        "r_antenna": (np.random.uniform(0.1, 0.3), np.random.uniform(-30.0, 30.0))
+                    }
+
+                    idle_start_time = time.time()
+
+                    while not self.stop_event.is_set():
+                        t_idle = time.time() - idle_start_time
+                        # Update arm and head joints with smooth sinusoidal offsets.
+                        for group, joints in [("l_arm", self.reachy.l_arm.joints),
+                                            ("r_arm", self.reachy.r_arm.joints),
+                                            ("head", self.reachy.head.joints)]:
+                            for name, joint in joints.items():
+                                freq, phase = idle_params[group][name]
+                                offset = idle_amplitude * np.sin(2 * np.pi * freq * t_idle + phase)
+                                joint.goal_position = idle_final_positions[group][name] + offset
+
+                        # Update grippers.
+                        for gripper, params in gripper_params.items():
+                            freq, phase = params
+                            offset = idle_amplitude_gripper * np.sin(2 * np.pi * freq * t_idle + phase)
+                            if gripper == "l_hand":
+                                self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + offset
+                            else:
+                                self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + offset
+
+                        # Update antennas.
+                        for antenna, params in antenna_params.items():
+                            freq, phase = params
+                            offset = idle_amplitude_antenna * np.sin(2 * np.pi * freq * t_idle + phase)
+                            if antenna == "l_antenna":
+                                self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + offset
+                            else:
+                                self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + offset
+
+                        self.reachy.send_goal_positions(check_positions=False)
+                        time.sleep(dt)
+
+                    # End of idle loop.
                     
                     break
 
