@@ -38,10 +38,8 @@ RECORD_FOLDER = "recordings"
 
 """
 TODOs
-- Initial head goto sometimes fails because it's unreachable??    
-- reachy turn on fails and is super long (5s) ??
-- Handle 1.5 start duration ? Why does it work??
-    
+- Maybe movements should start a bit after 1.6s. Because at that time most of them are static. So coming from a goto makes a weird stop.
+- IDLE -> weird looking small pause with 0 movements -> movement     
 """
 
 # ------------------------------------------------------------------------------
