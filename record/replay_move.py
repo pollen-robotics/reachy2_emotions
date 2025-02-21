@@ -287,14 +287,17 @@ class EmotionPlayer:
             input("Is Reachy ready to move? Press Enter to continue.")
         else:
             logging.info("Auto-start mode: proceeding without user confirmation.")
-        
+        # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
+        playback_offset = 1.6
         try:
             if first_duration > 0.0:
-                self.reachy.l_arm.goto(data["l_arm"][0], duration=first_duration, interpolation_mode="linear")
-                self.reachy.r_arm.goto(data["r_arm"][0], duration=first_duration, interpolation_mode="linear")
-                self.reachy.l_arm.gripper.set_opening(data["l_hand"][0])
-                self.reachy.r_arm.gripper.set_opening(data["r_hand"][0])
-                self.reachy.head.goto(data["head"][0], duration=first_duration, interpolation_mode="linear") # not using wait=true because it backfires if unreachable
+                current_time = playback_offset
+                index = bisect.bisect_right(data["time"], current_time)
+                self.reachy.l_arm.goto(data["l_arm"][index], duration=first_duration, interpolation_mode="linear")
+                self.reachy.r_arm.goto(data["r_arm"][index], duration=first_duration, interpolation_mode="linear")
+                # self.reachy.l_arm.gripper.set_opening(data["l_hand"][index]) # we need a goto for gripper so it's continuous
+                # self.reachy.r_arm.gripper.set_opening(data["r_hand"][index])
+                self.reachy.head.goto(data["head"][index], duration=first_duration, interpolation_mode="linear") # not using wait=true because it backfires if unreachable
                 time.sleep(first_duration)
             logging.info("First position reached.")
         except Exception as e:
@@ -312,8 +315,7 @@ class EmotionPlayer:
                 return
 
         dt = timeframe
-        # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
-        playback_offset = 1.6
+        
         t0 = time.time() - playback_offset
         
         try:
@@ -337,9 +339,7 @@ class EmotionPlayer:
                     self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
 
                     self.reachy.send_goal_positions(check_positions=False)
-                    logging.info(f"Reached end of recording normally")
                     
-                    # TODO iterate over this idea
                     logging.info("Reached end of recording normally, starting idle motion.")
 
                     # Capture the final positions as a reference.
