@@ -26,6 +26,7 @@ from reachy2_symbolic_ik.utils import make_homogenous_matrix_from_rotation_matri
 # For the Flask server mode:
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import difflib
 
 # ------------------------------------------------------------------------------
 # Logging configuration
@@ -207,13 +208,26 @@ class EmotionPlayer:
         if self.reachy is None:
             logging.error("No valid Reachy instance available.")
             return
+        
         # Build full path to the recording.
         if not filename.endswith(".json"):
             filename += ".json"
         path = os.path.join(self.record_folder, filename)
+        
+        # If the file doesn't exist, try to find the closest match.
         if not os.path.exists(path):
-            logging.error("Recording file %s not found", path)
-            return
+            available_emotions = list_available_emotions(self.record_folder)
+            # Remove .json extension from filename for matching.
+            base_name = os.path.splitext(filename)[0]
+            close_matches = difflib.get_close_matches(base_name, available_emotions, n=1, cutoff=0.6)
+            if close_matches:
+                new_filename = close_matches[0] + ".json"
+                logging.warning("Recording file %s not found; using closest match %s", filename, new_filename)
+                filename = new_filename
+                path = os.path.join(self.record_folder, filename)
+            else:
+                logging.error("Recording file %s not found and no close match available.", path)
+                return
         try:
             data, timeframe = load_data(path)
         except Exception as e:
