@@ -110,6 +110,22 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
 
     return np.max([distance_l_arm, distance_r_arm])
 
+def joint_distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
+    """Similar to distance_with_new_pose but returns the max angle distance that any joint must travel to reach the new pose.
+    """
+    max_dist = 0
+    for group, joints in [("l_arm", reachy.l_arm.joints),
+                          ("r_arm", reachy.r_arm.joints),
+                          ("head", reachy.head.joints)]:
+        idx=-1
+        for name, joint in joints.items():
+            idx +=1
+            dist = np.abs(joint.present_position - data[group][0][idx])
+            if dist > max_dist:
+                max_dist = dist
+    return max_dist
+
+
 def play_audio(audio_file: str, audio_device: Optional[str],
                start_event: threading.Event, audio_offset: float, stop_event: threading.Event):
     """
@@ -168,6 +184,7 @@ class EmotionPlayer:
         self.audio_offset = audio_offset
         self.record_folder = record_folder
         self.auto_start = auto_start  # In server mode, auto_start is True (no prompt)
+        self.max_joint_speed = 90.0  # degrees per second
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -244,13 +261,17 @@ class EmotionPlayer:
         
         # Check current positions to adapt the duration of the initial move.
         try:
-            max_dist = distance_with_new_pose(self.reachy, data)
+            # max_dist = distance_with_new_pose(self.reachy, data)
+            max_dist = joint_distance_with_new_pose(self.reachy, data) # better way imo
+            logging.info(f"max_dist = {max_dist}")
+            
         except Exception as e:
             logging.error("Error computing distance: %s", e)
             max_dist = 0
-        first_duration = max_dist * 5 # TODO: do better
-        if first_duration > 1.0:
-            first_duration = 1.0
+        # first_duration = max_dist * 5 # TODO: do 
+        first_duration = max_dist / self.max_joint_speed
+        logging.info("Computed initial move duration: %.2f seconds", first_duration)
+
         # For now we set a fixed short duration.
         # first_duration = 0.5
         
@@ -546,6 +567,9 @@ def run_server_mode(ip: str, audio_device: Optional[str],
         player.play_emotion(emotion_name)
 
         return jsonify({"status": "success", "result": f"Playing emotion {emotion_name}."}), 200
+    
+    # Start by playing a short emotion so that the idle state exists ASAP
+    player.play_emotion("fier2")
     
     app.run(port=flask_port, host="0.0.0.0")
 
