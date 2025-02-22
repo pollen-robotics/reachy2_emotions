@@ -205,6 +205,10 @@ class EmotionPlayer:
         except Exception as e:
             logging.error("Error turning on Reachy: %s", e)
             return
+        # NEW: add a send lock and idle thread controls.
+        self.send_lock = threading.Lock()
+        self.idle_thread = None
+        self.idle_stop_event = threading.Event()
     
     def play_emotion(self, filename: str):
         """
@@ -213,10 +217,52 @@ class EmotionPlayer:
         """
         with self.lock:
             self.stop()  # Stop current playback if any.
+            # Stop idle thread if it's running.
+            if self.idle_thread and self.idle_thread.is_alive():
+                self.idle_stop_event.set()
+                self.idle_thread.join()
+                self.idle_stop_event.clear()
             self.stop_event.clear()
-            time.sleep(1.0)
             self.thread = threading.Thread(target=self._replay_thread, args=(filename,))
             self.thread.start()
+    
+    def _idle_loop(self, idle_final_positions, idle_params, gripper_params, antenna_params, dt):
+        logging.info("Starting idle animation loop.")
+        # Define idle animation parameters.
+        idle_amplitude = 0.5        # maximum offset magnitude
+        idle_amplitude_antenna = 20.0
+        idle_amplitude_gripper = 10.0
+        idle_start_time = time.time()
+        while not self.idle_stop_event.is_set():
+            t_idle = time.time() - idle_start_time
+            # Update arm and head joints with smooth sinusoidal idle offsets.
+            for group, joints in [("l_arm", self.reachy.l_arm.joints),
+                                  ("r_arm", self.reachy.r_arm.joints),
+                                  ("head", self.reachy.head.joints)]:
+                for name, joint in joints.items():
+                    freq, phase = idle_params[group][name]
+                    offset = idle_amplitude * np.sin(2 * np.pi * freq * t_idle + phase)
+                    joint.goal_position = idle_final_positions[group][name] + offset
+            # Update grippers.
+            for gripper, params in gripper_params.items():
+                freq, phase = params
+                offset = idle_amplitude_gripper * np.sin(2 * np.pi * freq * t_idle + phase)
+                if gripper == "l_hand":
+                    self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + offset
+                else:
+                    self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + offset
+            # Update antennas.
+            for antenna, params in antenna_params.items():
+                freq, phase = params
+                offset = idle_amplitude_antenna * np.sin(2 * np.pi * freq * t_idle + phase)
+                if antenna == "l_antenna":
+                    self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + offset
+                else:
+                    self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + offset
+            with self.send_lock:
+                self.reachy.send_goal_positions(check_positions=False)
+            time.sleep(dt)
+        logging.info("Idle animation loop stopped.")
     
     def _replay_thread(self, filename: str):
         logging.info("Starting emotion playback for %s", filename)
@@ -368,13 +414,9 @@ class EmotionPlayer:
                         "r_antenna": self.reachy.head.r_antenna.goal_position,
                     }
 
-                    # Define idle animation parameters.
-                    idle_amplitude = 0.5        # maximum offset magnitude
-                    idle_amplitude_antenna = 20.0
-                    idle_amplitude_gripper = 10.0
-                    # Note : setting phase at 0 otherwise we have a discontinuity
-
                     # For each joint, assign a random frequency (Hz) and phase offset.
+                    # Note : setting phase at 0 otherwise we have a discontinuity
+                    
                     idle_params = {
                         "l_arm": {},
                         "r_arm": {},
@@ -385,12 +427,12 @@ class EmotionPlayer:
                                             ("head", self.reachy.head.joints)]:
                         for name in idle_final_positions[group]:
                             freq = np.random.uniform(0.1, 0.3)  # smooth oscillation (0.1-0.3 Hz)
-                            phase = 0.0#np.random.uniform(0, 2 * np.pi)
+                            phase = 0.0 #np.random.uniform(0, 2 * np.pi)
                             idle_params[group][name] = (freq, phase)
 
                     # Also assign parameters for grippers and antennas.
                     gripper_params = {
-                        "l_hand": (np.random.uniform(0.1, 0.3),0.0),
+                        "l_hand": (np.random.uniform(0.1, 0.3), 0.0),
                         "r_hand": (np.random.uniform(0.1, 0.3), 0.0)
                     }
                     antenna_params = {
@@ -398,42 +440,10 @@ class EmotionPlayer:
                         "r_antenna": (np.random.uniform(0.1, 0.3), 0.0)
                     }
 
-                    idle_start_time = time.time()
-
-                    while not self.stop_event.is_set():
-                        t_idle = time.time() - idle_start_time
-                        # Update arm and head joints with smooth sinusoidal offsets.
-                        for group, joints in [("l_arm", self.reachy.l_arm.joints),
-                                            ("r_arm", self.reachy.r_arm.joints),
-                                            ("head", self.reachy.head.joints)]:
-                            for name, joint in joints.items():
-                                freq, phase = idle_params[group][name]
-                                offset = idle_amplitude * np.sin(2 * np.pi * freq * t_idle + phase)
-                                joint.goal_position = idle_final_positions[group][name] + offset
-
-                        # Update grippers.
-                        for gripper, params in gripper_params.items():
-                            freq, phase = params
-                            offset = idle_amplitude_gripper * np.sin(2 * np.pi * freq * t_idle + phase)
-                            if gripper == "l_hand":
-                                self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + offset
-                            else:
-                                self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + offset
-
-                        # Update antennas.
-                        for antenna, params in antenna_params.items():
-                            freq, phase = params
-                            offset = idle_amplitude_antenna * np.sin(2 * np.pi * freq * t_idle + phase)
-                            if antenna == "l_antenna":
-                                self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + offset
-                            else:
-                                self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + offset
-
-                        self.reachy.send_goal_positions(check_positions=False)
-                        time.sleep(dt)
-
-                        # End of idle loop.
-                    # End of play_emotion
+                    # Instead of running the idle loop inline, start it in a separate thread.
+                    self.idle_stop_event.clear()
+                    self.idle_thread = threading.Thread(target=self._idle_loop, args=(idle_final_positions, idle_params, gripper_params, antenna_params, dt))
+                    self.idle_thread.start()
                     break
 
                 # Locate the right interval in the recorded time array.
