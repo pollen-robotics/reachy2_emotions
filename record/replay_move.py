@@ -296,7 +296,24 @@ class EmotionPlayer:
                 # self.reachy.l_arm.gripper.set_opening(data["l_hand"][index]) # we need a goto for gripper so it's continuous
                 # self.reachy.r_arm.gripper.set_opening(data["r_hand"][index])
                 self.reachy.head.goto(data["head"][index], duration=first_duration, interpolation_mode="linear") # not using wait=true because it backfires if unreachable
-                time.sleep(first_duration)
+                # Instead, we interpolate the antennas and grippers by hand during first_duration. This also provides the delay needed for the arms+head gotos.
+                l_gripper_goal = data["l_hand"][index]
+                r_gripper_goal = data["r_hand"][index]
+                l_antenna_goal = data["l_antenna"][index]
+                r_antenna_goal = data["r_antenna"][index]
+                l_gripper_pos = self.reachy.l_arm.gripper.present_position
+                r_gripper_pos = self.reachy.r_arm.gripper.present_position
+                l_antenna_pos = self.reachy.head.l_antenna.present_position
+                r_antenna_pos = self.reachy.head.r_antenna.present_position
+                t0 = time.time()
+                while time.time() - t0 < first_duration:
+                    alpha = (time.time() - t0) / first_duration
+                    self.reachy.l_arm.gripper.goal_position = lerp(l_gripper_pos, l_gripper_goal, alpha)
+                    self.reachy.r_arm.gripper.goal_position = lerp(r_gripper_pos, r_gripper_goal, alpha)
+                    self.reachy.head.l_antenna.goal_position = lerp(l_antenna_pos, l_antenna_goal, alpha)
+                    self.reachy.head.r_antenna.goal_position = lerp(r_antenna_pos, r_antenna_goal, alpha)
+                    self.reachy.send_goal_positions(check_positions=False)
+                    time.sleep(0.01)
             logging.info("First position reached.")
         except Exception as e:
             logging.error("Error moving to initial position: %s", e)
