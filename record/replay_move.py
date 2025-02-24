@@ -224,10 +224,9 @@ class EmotionPlayer:
                 self.idle_thread.join()
                 self.idle_stop_event.clear()
             self.stop_event.clear()
-            # self.thread = threading.Thread(target=self._replay_thread, args=(filename,))
-            # smart_interpol wip. _replay_thread_smart_interpol_my_antenna_example -> is my example, this is the generalisation:
-            self.thread = threading.Thread(target=self._replay_thread_smart_interpol, args=(filename,))
-            # TODO the movement is shaky, think about this. Probably a bad dt and speed calculation. The formula should be a blend of the two speeds, not a sum. The blend should be based on the distance to the target.
+            self.thread = threading.Thread(target=self._replay_thread, args=(filename,))
+            # Seems to work but it's shaky. The dt of the recordings is quite high (~30Hz), maybe setting a fix dt for speed calculations is bad?
+            # self.thread = threading.Thread(target=self._replay_thread_smart_interpol, args=(filename,))
             
             self.thread.start()
     
@@ -551,7 +550,6 @@ class EmotionPlayer:
         except Exception as e:
             logging.error("Error computing distance: %s", e)
             max_dist = 0
-        # first_duration = max_dist * 5 # TODO: do 
         first_duration = max_dist / self.max_joint_speed
         logging.info("Computed initial move duration: %.2f seconds", first_duration)
         
@@ -593,6 +591,7 @@ class EmotionPlayer:
                 idx_next = index if index < len(data["time"]) else idx_prev
                 t_prev = data["time"][idx_prev]
                 t_next = data["time"][idx_next]
+                # logging.info(f"t_next - t_prev = {t_next - t_prev}")
                 alpha = 0.0 if t_next == t_prev else (current_time - t_prev) / (t_next - t_prev)
                 if joint_index is not None:
                     target = lerp(channel_data[idx_prev][joint_index], channel_data[idx_next][joint_index], alpha)
@@ -600,7 +599,7 @@ class EmotionPlayer:
                     target = lerp(channel_data[idx_prev], channel_data[idx_next], alpha)
                 
                 # Find recorded target at current_time+dt.
-                index_dt = bisect.bisect_right(data["time"], current_time + dt)
+                index_dt = bisect.bisect_right(data["time"], current_time+dt)
                 idx_prev_dt = index_dt - 1 if index_dt > 0 else 0
                 idx_next_dt = index_dt if index_dt < len(data["time"]) else idx_prev_dt
                 t_prev_dt = data["time"][idx_prev_dt]
@@ -612,12 +611,13 @@ class EmotionPlayer:
                     target_next = lerp(channel_data[idx_prev_dt], channel_data[idx_next_dt], alpha_dt)
                 
                 # Recorded speed: the movement requested in the recording.
-                rec_speed = (target_next - target) / dt
+                rec_speed = 10*(target_next - target) / dt
                 # Interpolation speed: the speed required to reach the target from the current goal.
                 interp_speed = np.clip((target - current_goal) / dt, -max_speed, max_speed)
                 
-                return current_goal + dt * (rec_speed + interp_speed)
-                # return current_goal + dt * (rec_speed + 0)
+                # return current_goal + dt * (0+  interp_speed)
+                # return current_goal + dt * (rec_speed + interp_speed)
+                return current_goal + dt * (rec_speed + 0)
             
             while not self.stop_event.is_set():
                 current_time = time.time() - t0  # elapsed time since playback started
@@ -728,7 +728,7 @@ class EmotionPlayer:
 
                 calculation_duration = time.time() - t0 - current_time
                 margin = dt_loop - calculation_duration
-                logging.info(f"(all in ms) margin = {margin*1000:.0f}, dt_loop = {dt_loop*1000:.0f}, calculation_duration = {calculation_duration*1000:.0f}")
+                # logging.info(f"(all in ms) margin = {margin*1000:.0f}, dt_loop = {dt_loop*1000:.0f}, calculation_duration = {calculation_duration*1000:.0f}")
                 
                 if margin > 0:
                     time.sleep(margin)
