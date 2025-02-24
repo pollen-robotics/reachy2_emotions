@@ -183,7 +183,7 @@ class EmotionPlayer:
         self.audio_offset = audio_offset
         self.record_folder = record_folder
         self.auto_start = auto_start  # In server mode, auto_start is True (no prompt)
-        self.max_joint_speed = 30.0  # degrees per second
+        self.max_joint_speed = 40.0  # degrees per second. Tunned on robot
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -235,7 +235,7 @@ class EmotionPlayer:
         logging.info("Starting idle animation loop.")
         # Define idle animation parameters.
         idle_amplitude = 0.5        # maximum offset magnitude
-        idle_amplitude_antenna = 20.0
+        idle_amplitude_antenna = 10.0
         idle_amplitude_gripper = 10.0
         idle_start_time = time.time()
         while not self.idle_stop_event.is_set():
@@ -342,10 +342,13 @@ class EmotionPlayer:
             if first_duration > 0.0:
                 current_time = playback_offset
                 index = bisect.bisect_right(data["time"], current_time)
+                logging.info(f"l_arm goto: {data['l_arm'][index]}")
                 self.reachy.l_arm.goto(data["l_arm"][index], duration=first_duration, interpolation_mode="linear")
+                logging.info("r_arm goto")
                 self.reachy.r_arm.goto(data["r_arm"][index], duration=first_duration, interpolation_mode="linear")
                 # self.reachy.l_arm.gripper.set_opening(data["l_hand"][index]) # we need a goto for gripper so it's continuous
                 # self.reachy.r_arm.gripper.set_opening(data["r_hand"][index])
+                logging.info("head goto")
                 self.reachy.head.goto(data["head"][index], duration=first_duration, interpolation_mode="linear") # not using wait=true because it backfires if unreachable
                 # Instead, we interpolate the antennas and grippers by hand during first_duration. This also provides the delay needed for the arms+head gotos.
                 l_gripper_goal = data["l_hand"][index]
@@ -447,7 +450,7 @@ class EmotionPlayer:
 
                     # Instead of running the idle loop inline, start it in a separate thread.
                     self.idle_stop_event.clear()
-                    self.idle_thread = threading.Thread(target=self._idle_loop, args=(idle_final_positions, idle_params, gripper_params, antenna_params, dt))
+                    self.idle_thread = threading.Thread(target=self._idle_loop, args=(idle_final_positions, idle_params, gripper_params, antenna_params, 0.01))
                     self.idle_thread.start()
                     break
 
