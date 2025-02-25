@@ -13,7 +13,7 @@ missing_wav = json_files - wav_files
 
 # Afficher les fichiers classés
 print("📂 Fichiers présents (JSON et WAV) par ordre alphabétique :")
-for file in sorted(files):
+for file in sorted(json_files):
     print(file)
 
 # Afficher les anomalies
