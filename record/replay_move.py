@@ -854,7 +854,7 @@ def print_available_emotions() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Replay Reachy's movements with recorded audio and/or run a Flask server for emotion requests."
+        description="Replay Reachy's movements with recorded audio and/or run a Flask server for emotion requests. Example: \npython3 replay_move.py --ip localhost --filename abattu1"
     )
     parser.add_argument("--ip", type=str, default="localhost",
                         help="IP address of the robot")
@@ -874,6 +874,7 @@ if __name__ == "__main__":
                         help="Play all available emotions sequentially.")
     parser.add_argument("--list", action="store_true",
                         help="Print all available emotions")
+    
     args = parser.parse_args()
     
     if args.list_audio_devices:
@@ -886,5 +887,8 @@ if __name__ == "__main__":
         print_available_emotions()
     elif args.server:
         run_server_mode(args.ip, args.audio_device, args.audio_offset, args.flask_port)
-    else:
+    elif args.filename is not None:
         run_cli_mode(args.ip, args.filename, args.audio_device, args.audio_offset)
+    else:
+        parser.print_help()
+        exit(1)
