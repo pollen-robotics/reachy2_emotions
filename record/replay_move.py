@@ -11,17 +11,6 @@ import logging
 from typing import Optional, Tuple
 from reachy2_sdk import ReachySDK  # type: ignore
 import bisect
-import numpy.typing as npt
-from google.protobuf.wrappers_pb2 import FloatValue, Int32Value
-from reachy2_sdk_api.arm_pb2 import (
-    ArmCartesianGoal,
-    IKConstrainedMode,
-    IKContinuousMode,
-)
-from reachy2_sdk_api.kinematics_pb2 import Matrix4x4
-from scipy.spatial.transform import Rotation as R
-
-from reachy2_symbolic_ik.utils import make_homogenous_matrix_from_rotation_matrix
 
 # For the Flask server mode:
 from flask import Flask, request, jsonify
@@ -849,6 +838,16 @@ def run_server_mode(ip: str, audio_device: Optional[str],
     player.play_emotion("fier2")
     
     app.run(port=flask_port, host="0.0.0.0")
+    
+# Print all available emotions
+def print_available_emotions() -> None:
+    """
+    Print all available emotions in the record folder.
+    """
+
+    emotions = list_available_emotions(RECORD_FOLDER)
+    print("Available emotions:")
+    print(emotions)
 
 # ------------------------------------------------------------------------------
 # Main entry point
@@ -871,9 +870,10 @@ if __name__ == "__main__":
                         help="Run in Flask server mode to accept emotion requests")
     parser.add_argument("--flask-port", type=int, default=5001,
                         help="Port for the Flask server (default: 5001)")
-    # New command-line argument for playing all emotions
     parser.add_argument("--all-emotions", action="store_true",
                         help="Play all available emotions sequentially.")
+    parser.add_argument("--list", action="store_true",
+                        help="Print all available emotions")
     args = parser.parse_args()
     
     if args.list_audio_devices:
@@ -882,6 +882,8 @@ if __name__ == "__main__":
     
     if args.all_emotions:
         run_all_emotions_mode(args.ip, args.audio_device, args.audio_offset)
+    elif args.list:
+        print_available_emotions()
     elif args.server:
         run_server_mode(args.ip, args.audio_device, args.audio_offset, args.flask_port)
     else:
