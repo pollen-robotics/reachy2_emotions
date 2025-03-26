@@ -806,7 +806,8 @@ def run_server_mode(ip: str, audio_device: Optional[str],
     New requests interrupt current playback.
     """
     player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
-    # allowed_emotions = list_available_emotions(RECORD_FOLDER) # disabled since we have some bad recordings
+    # allowed_emotions = list_available_emotions(RECORD_FOLDER) # enables all possible emotions
+    # Allowing only a subset of emotions
     allowed_emotions = ["dodo1", "ecoute2", "fatigue1", "ecoute1", "macarena1", "curieux1", "solitaire1", "ennui2", "fatigue2", "furieux2", "ennui1", "apaisant1", "timide1", "anxiete1", "perdu1", "triste1", "abattu1", "furieux1", "attentif1", "enthousiaste2", "enthousiaste3", "attentif2", "confus1", "penseur1", "oui_triste1", "fier1", "frustre1", "incertain1", "enthousiaste1", "serenite1", "aimant1", "serenite2", "impatient1", "serviable2", "degoute1", "accueillant1", "enjoue1", "mecontent1", "peur2", "mecontent2", "interrogatif2", "non_triste1", "incomprehensif1", "reconnaissant1", "rieur1", "soulagement1", "comprehension1", "enerve2", "impatient2", "non", "serviable1", "patient1", "oui1", "enerve1", "frustre2", "mepris1", "amical1", "non_excite1", "etonne1", "fier2", "emerveille1", "oui_excite1", "resigne1", "interrogatif1", "oups1", "peur1", "surpris1", "rieur2", "comprehension2", "celebrant1"]
 
     logging.info("Available emotions: %s", allowed_emotions)
@@ -835,7 +836,7 @@ def run_server_mode(ip: str, audio_device: Optional[str],
         return jsonify({"status": "success", "result": f"Playing emotion {emotion_name}."}), 200
     
     # Start by playing a short emotion so that the idle state exists ASAP
-    player.play_emotion("fier2")
+    player.play_emotion("proud2")
     
     app.run(port=flask_port, host="0.0.0.0")
     
