@@ -12,8 +12,8 @@ def test_interrupt():
     Make sure your Flask server is running (default: http://localhost:5001)
     and that the emotion names used here match the ones allowed by the server.
     """
-    emotion1 = "furieux1"
-    emotion2 = "aimant1"
+    emotion1 = "furious1"
+    emotion2 = "loving1"
     url = "http://localhost:5001/play_emotion"
     headers = {"Content-Type": "application/json"}
     
