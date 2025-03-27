@@ -1,99 +1,148 @@
-# reachy2_emotions
-Record and replay emotions on Reachy2!
+# 🤖 reachy2_emotions
 
-📦 Installing the Project
+Record, replay, and experiment with expressive emotions on Reachy2!
+This package provides CLI tools and utilities to capture synchronized motion and audio, replay them with smooth transitions, and serve emotion playback over a web API.
+
+---
+
+## 🎬 Demo
+
+
+<div align="center">
+  <img src="docs/gifs/cheerful.gif" width="250"/>
+  <img src="docs/gifs/disgusted.gif" width="250"/>
+  <img src="docs/gifs/curious.gif" width="250"/>
+</div>
+
+---
+
+## 🛠 Installation
 
 For regular users:
-```
+
+```bash
 pip install .[tools]
 ```
 
-For contributors / development:
-```
+For development:
+```bash
 pip install -e .[dev,tools]
 ```
-This enables live editing and access to dev tools like black, pytest, and documentation generators.
+
+This enables live editing, linting, testing, and access to all CLI tools.
 
 
+🖥 CLI Tools
 
-### 🖥 Command Line Tools
+After installation, two commands are available:
+### emotion-record
 
-After installation, you can use the following commands:
-
-- `emotion-record` — to record a new emotion movement
-- `emotion-play` — to replay an existing recording
-
-#### Examples:
-
+Records Reachy’s joint motions and microphone audio into .json and .wav files.
 ```bash
-emotion-record --emotion surprised
-emotion-play --file uncomfortable1
+emotion-record --ip 192.168.1.42 --filename amazed1 --audio-device "USB Audio Device"
 ```
 
-### Record/replay
+Arguments:
 
-**Strong** inspiration from Claire's work:
-https://github.com/pollen-robotics/demo_events/tree/main
+    --ip: IP of Reachy (default: localhost)
 
+    --filename: base name for output files
 
+    --freq: recording frequency (default: 100Hz)
 
-1. **To record a move**: you can execute the record_move.py script. 
+    --audio-device: name or ID of the audio input device
 
-It captures the joint positions of arms, grippers and head on a JSON file (/!\ no recording of the mobile base).
+    --list-audio-devices: list available audio input devices
 
-Stop the recording with CTRL+C.
+    --record-folder: optional override for output folder
 
-There are some parameters that you can tune : 
-- ip address (<code>--ip *"put_ip_address"*</code>)
-- name of the new recording (<code>--name *"filename_you_want"*</code>)
-- frequency of the data capture (<code>--freq *wanted_Hz_rate*</code>)
+### emotion-play
 
-By default, if you execute the script without specifing them, the ip address is localhost, the filename is "recording_MMdd_hhmm" and the frequency is 100Hz. 
+Replays recorded joint trajectories and synchronized audio, with smooth interpolation and idle animations at the end.
 
-Once the recording is over, the new JSON file will be added to the recordings folder.
+```bash
+emotion-play --ip 192.168.1.42 --name amazed1
+```
 
+Arguments:
 
-2. **To replay the move** : you can execute the replay_move.py script.
+    --ip: IP of Reachy
 
-You can also tune some parameters : 
-- ip address (<code>--ip *"put_ip_address"*</code>) 
-- name of the recording you want to replay (<code>--name *"filename_you_want"*</code>)
+    --name: name of the recording (without extension)
 
-By default, if you execute the script without specifing them, the ip address is localhost and the file replayed is the last recorded one. 
+    --audio-device: optional audio output device
 
-Note: Interpolation methods are used under the hood to avoid brutal movements at the start of an emotion.
+    --audio-offset: offset between motion and audio
 
+    --record-folder: folder to load recordings from
 
-## Tools
-### `rank.py`
+    --server: launch a Flask server to accept emotion replay commands
 
-Ranks all `.wav` files in a folder by duration (descending). Helpful for detecting unusually long or short emotion recordings.
+    --flask-port: port for the server (default: 5001)
 
-#### Usage:
+    --list: list available emotions
 
+    --all-emotions: play all available recordings sequentially
+
+🎛 Tools
+### rank.py
+
+Ranks all .wav files in a folder by duration.
 ```bash
 python tools/rank.py
 ```
 
-### `verif.py`
+### verif.py
 
-Checks that every `.json` file has a corresponding `.wav` file (and vice versa) in the specified folder. Useful to detect broken or incomplete emotion pairs in your dataset.
-
-#### Usage:
-
+Checks that each .json file has a matching .wav, and vice versa.
 ```bash
-python3 tools/verif.py
+python tools/verif.py
 ```
 
-### `trim_all.py`
+### trim_all.py
 
-Trims the first seconds of each `.wav` file in a folder. Useful if there's silence or unwanted audio at the beginning of your emotion recordings.
--> Typically used to remove the first ~1.6 seconds of autio before the "BIP" that's used in the record.py to synchronize.
-
-⚠️ This overwrites files in-place!
-
-#### Usage:
-
+Trims the first N seconds from all .wav files (default: 1.6s).
+Used to align audio playback with motion onset after a BIP cue.
 ```bash
-python3 tools/trim_all.py
+python tools/trim_all.py
 ```
+
+⚠️ This modifies files in-place.
+
+🧪 Testing & Development
+
+To install dev dependencies:
+```bash
+pip install -e .[dev,tools]
+```
+
+To auto-format code:
+```bash
+black . --line-length 128
+isort .
+```
+
+📁 Folder Structure
+```
+reachy2_emotions/
+├── data/                # Emotion recordings (.json + .wav)
+├── reachy2_emotions/    # Core source code (record + replay logic)
+├── tools/               # Utility scripts (verif, trim, rank, etc.)
+├── tests/
+├── README.md
+├── pyproject.toml
+└── LICENSE
+```
+🧬 Acknowledgements
+
+Inspired by Claire’s early work on demo_events.
+
+Developed by Pollen Robotics to explore expressive, communicative robots using Reachy2.
+
+📢 Contributions
+
+Contributions, ideas, and feedback are welcome!
+Feel free to open issues or submit pull requests.
+🧾 License
+
+This project is licensed under the terms of the Apache 2.0 licence.
