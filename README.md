@@ -125,6 +125,7 @@ reachy2_emotions/
 ├── reachy2_emotions/    # Core source code (record + replay logic)
 ├── tools/               # Utility scripts (verif, trim, rank, etc.)
 ├── tests/
+├── docs/
 ├── README.md
 ├── pyproject.toml
 └── LICENSE
