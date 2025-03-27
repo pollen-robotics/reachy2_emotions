@@ -1,20 +1,16 @@
 # 🤖 reachy2_emotions
 
+<div align="center">
+  <img src="docs/gifs/accueillant1-pink-small.gif" width="220"/>
+  <img src="docs/gifs/gene1-deepblue-small.gif" width="220"/>
+  <img src="docs/gifs/perdu1-yellow-small.gif" width="220"/>
+</div>
+
 Record, replay, and experiment with expressive emotions on Reachy2!
 This package provides CLI tools and utilities to capture synchronized motion and audio, replay them with smooth transitions, and serve emotion playback over a web API.
 
 ---
 
-## 🎬 Demo
-
-
-<div align="center">
-  <img src="docs/gifs/cheerful.gif" width="250"/>
-  <img src="docs/gifs/disgusted.gif" width="250"/>
-  <img src="docs/gifs/curious.gif" width="250"/>
-</div>
-
----
 
 ## 🛠 Installation
 
