@@ -1,4 +1,4 @@
-# 🤖 reachy2_emotions
+# reachy2_emotions
 
 <div align="center">
   <img src="docs/gifs/accueillant1-pink-small.gif" width="220"/>
