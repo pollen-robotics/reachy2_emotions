@@ -51,6 +51,16 @@ By default, if you execute the script without specify them, the ip address is lo
 
 
 ## Tools
+### `rank.py`
+
+Ranks all `.wav` files in a folder by duration (descending). Helpful for detecting unusually long or short emotion recordings.
+
+#### Usage:
+
+```bash
+python tools/rank.py
+```
+
 ### `verif.py`
 
 Checks that every `.json` file has a corresponding `.wav` file (and vice versa) in the specified folder. Useful to detect broken or incomplete emotion pairs in your dataset.
