@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-import time
-import requests
 import json
+import time
+
+import requests
+
 
 def test_interrupt():
     """
     Sends two emotion requests in quick succession to test interrupting
     an ongoing emotion playback. The first request starts one move,
     and after a short delay the second request is sent to interrupt it.
-    
+
     Make sure your Flask server is running (default: http://localhost:5001)
     and that the emotion names used here match the ones allowed by the server.
     """
@@ -16,12 +18,8 @@ def test_interrupt():
     emotion2 = "loving1"
     url = "http://localhost:5001/play_emotion"
     headers = {"Content-Type": "application/json"}
-    
-    payload1 = {
-        "input_text": "First emotion move",
-        "thought_process": "Starting first move",
-        "emotion_name": f"{emotion1}"
-    }
+
+    payload1 = {"input_text": "First emotion move", "thought_process": "Starting first move", "emotion_name": f"{emotion1}"}
     print("Sending first emotion request...")
     try:
         response1 = requests.post(url, json=payload1, headers=headers)
@@ -31,13 +29,13 @@ def test_interrupt():
         return
 
     # Wait briefly to let the first move start
-    time.sleep(2)  
+    time.sleep(2)
 
     # Second emotion request (should interrupt the first; use another allowed emotion, e.g., "accueillant")
     payload2 = {
         "input_text": "Second emotion move",
         "thought_process": "Interrupting first move",
-        "emotion_name": f"{emotion2}"
+        "emotion_name": f"{emotion2}",
     }
     print("Sending second emotion request to interrupt the first...")
     try:
@@ -45,6 +43,7 @@ def test_interrupt():
         print("Response 2:", response2.status_code, response2.json())
     except Exception as e:
         print("Error sending second request:", e)
+
 
 if __name__ == "__main__":
     test_interrupt()

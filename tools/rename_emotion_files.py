@@ -1,5 +1,5 @@
-import os
 import csv
+import os
 
 # Set your folder here
 folder = "./recordings"
@@ -7,10 +7,10 @@ mapping_file = "emotions_map.csv"
 
 # Load the mapping
 mapping = {}
-with open(mapping_file, newline='', encoding='utf-8') as csvfile:
+with open(mapping_file, newline="", encoding="utf-8") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
-        mapping[row['EMOTIONS'].lower()] = row['TRADUCTION'].lower()
+        mapping[row["EMOTIONS"].lower()] = row["TRADUCTION"].lower()
 
 # Apply the renaming
 for filename in os.listdir(folder):

@@ -1,50 +1,141 @@
 # reachy2_emotions
 
-## Installation
+<div align="center">
+  <img src="docs/gifs/accueillant1-pink-small.gif" width="220"/>
+  <img src="docs/gifs/gene1-deepblue-small.gif" width="220"/>
+  <img src="docs/gifs/perdu1-yellow-small.gif" width="220"/>
+</div>
+
+Record, replay, and experiment with expressive emotions on Reachy2!
+This package provides CLI tools and utilities to capture synchronized motion and audio, replay them with smooth transitions, and serve emotion playback over a web API.
+
+---
+
+
+## 🛠 Installation
+
+For regular users:
+
+```bash
+pip install -e .[tools]
 ```
-pip3 install sounddevice soundfile
+
+For development:
+```bash
+pip install -e .[dev,tools]
 ```
 
-## Common commands
+This enables live editing, linting, testing, and access to all CLI tools.
+
+
+## 🖥 Record and replay Tools
+
+After installation, two commands are available:
+### emotion-record
+
+Records Reachy’s joint motions and microphone audio into .json and .wav files.
+```bash
+emotion-record --ip 192.168.1.42 --filename amazed1 --audio-device "USB Audio Device"
 ```
-python3 replay_move.py  --audio-offset -2.0
 
-python3 record_move.py
+Arguments:
+
+    --ip: IP of Reachy (default: localhost)
+
+    --filename: base name for output files
+
+    --freq: recording frequency (default: 100Hz)
+
+    --audio-device: name or ID of the audio input device
+
+    --list-audio-devices: list available audio input devices
+
+    --record-folder: optional override for output folder
+
+### emotion-play
+
+Replays recorded joint trajectories and synchronized audio, with smooth interpolation and idle animations at the end.
+
+```bash
+emotion-play --ip 192.168.1.42 --name amazed1
 ```
 
-## Source code
-The list and versions of the repos of the hackathon emotion project are on the emotion branch:
-https://github.com/pollen-robotics/docker_reachy2_core/tree/emotions
+Arguments:
 
+    --ip: IP of Reachy
 
+    --name: name of the recording (without extension)
 
-### Record/replay
+    --audio-device: optional audio output device
 
-**Strong** inspiration from Claire's work:
-https://github.com/pollen-robotics/demo_events/tree/main
+    --audio-offset: offset between motion and audio
 
+    --record-folder: folder to load recordings from
 
+    --server: launch a Flask server to accept emotion replay commands
 
-1. **To record a move**: you can execute the record_move.py script. 
+    --flask-port: port for the server (default: 5001)
 
-It captures the joint positions of arms, grippers and head on a JSON file (/!\ no recording of the mobile base). 
+    --list: list available emotions
 
-There are some parameters that you can tune : 
-- ip address (<code>--ip *"put_ip_address"*</code>)
-- filename of the new recording (<code>--filename *"filename_you_want"*</code>)
-- frequency of the data capture (<code>--freq *wanted_Hz_rate*</code>)
+    --all-emotions: play all available recordings sequentially
 
-By default, if you execute the script without specify them, the ip address is localhost, the filename is "recording_MMdd_hhmm" and the frequency is 100Hz. 
+## 🎛 Utility Tools
+### rank.py
 
-Once the recording is over, the new JSON file will be added to the recordings folder.
+Ranks all .wav files in a folder by duration.
+```bash
+python tools/rank.py
+```
 
+### verif.py
 
-2. **To replay the move** : you can execute the replay_move.py script.
+Checks that each .json file has a matching .wav, and vice versa.
+```bash
+python tools/verif.py
+```
 
-You can also tune some parameters : 
-- ip address (<code>--ip *"put_ip_address"*</code>) 
-- filename of the recording you want to replay (<code>--filename *"filename_you_want"*</code>)
+### trim_all.py
 
-By default, if you execute the script without specify them, the ip address is localhost and the file replayed is the last recorded one. 
+Trims the first N seconds from all .wav files (default: 1.6s).
+Used to align audio playback with motion onset after a BIP cue.
+```bash
+python tools/trim_all.py
+```
 
-> Be careful that Reachy needs to be turned on already. And don't worry, the first pose will be reached with a time proportional to the distance from the current pose (if the robot has a pose very different from the first pose of the recording, it will go slowly to this pose)
+⚠️ This modifies files in-place.
+
+## 🧪 Testing & Development
+
+To auto-format code:
+```bash
+black . --line-length 128
+isort .
+```
+
+## 📁 Folder Structure
+```
+reachy2_emotions/
+├── data/                # Emotion recordings (.json + .wav)
+├── reachy2_emotions/    # Core source code (record + replay logic)
+├── tools/               # Utility scripts (verif, trim, rank, etc.)
+├── tests/
+├── docs/
+├── README.md
+├── pyproject.toml
+└── LICENSE
+```
+## 🧬 Acknowledgements
+
+Record/replay scripts inspired by [Claire’s work on demo_events](https://github.com/pollen-robotics/demo_events/tree/main).
+
+Developed by Pollen Robotics to explore expressive, communicative robots using Reachy2.
+
+## 📢 Contributions
+
+Contributions, ideas, and feedback are welcome!
+Feel free to open issues or submit pull requests.
+
+## 🧾 License
+
+This project is licensed under the terms of the Apache 2.0 licence.
