@@ -48,3 +48,14 @@ You can also tune some parameters :
 By default, if you execute the script without specify them, the ip address is localhost and the file replayed is the last recorded one. 
 
 > Be careful that Reachy needs to be turned on already. And don't worry, the first pose will be reached with a time proportional to the distance from the current pose (if the robot has a pose very different from the first pose of the recording, it will go slowly to this pose)
+
+
+## Tools
+### `verif.py`
+
+Checks that every `.json` file has a corresponding `.wav` file (and vice versa) in the specified folder. Useful to detect broken or incomplete emotion pairs in your dataset.
+
+#### Usage:
+
+```bash
+python3 tools/verif.py
