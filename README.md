@@ -25,6 +25,12 @@ For development:
 pip install -e .[dev,tools]
 ```
 
+Package install:
+```bash
+sudo apt-get install libportaudio2
+```
+
+
 This enables live editing, linting, testing, and access to all CLI tools.
 
 
