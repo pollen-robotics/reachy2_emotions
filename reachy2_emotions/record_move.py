@@ -7,10 +7,15 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 import threading  # Added for scheduling the beep
+import pathlib
 
 from reachy2_sdk import ReachySDK  # type: ignore
 
-def main(ip: str, filename: str, freq: int, audio_device: str):
+
+# Folder with recordings (JSON + corresponding WAV files)
+RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
+
+def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: str) -> None:
     # connect to Reachy
     reachy = ReachySDK(host=ip)
 
@@ -92,9 +97,9 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
         # Stop the audio stream
         audio_stream.stop()
         audio_stream.close()
-
         # Create recordings folder if needed
-        directory = "recordings"
+        directory = pathlib.Path(record_folder)
+
         os.makedirs(directory, exist_ok=True)
 
         # Save motion data to JSON file
@@ -102,7 +107,7 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
         file_path = os.path.join(directory, full_filename)
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
-        print(f"Robot motion data saved to {full_filename}.")
+        print(f"Robot motion data saved to {file_path}.")
         print(f"Time of recording: {time.time() - t0:.2f} seconds")
 
         # Save recorded audio to a WAV file.
@@ -116,7 +121,10 @@ def main(ip: str, filename: str, freq: int, audio_device: str):
         else:
             print("No audio data was recorded.")
 
-if __name__ == "__main__":
+
+# ------------------------------------------------------------------------------
+# Main entry point
+def main():
     d = datetime.datetime.now()
     default_filename = f"recording_{d.strftime('%m%d_%H%M')}.json"
     parser = argparse.ArgumentParser(
@@ -129,7 +137,7 @@ if __name__ == "__main__":
         help="IP address of the robot",
     )
     parser.add_argument(
-        "--filename",
+        "--name",
         type=str,
         default=default_filename,
         help="Name of the file to save the robot data (audio will use the same base name)",
@@ -152,10 +160,19 @@ if __name__ == "__main__":
         action="store_true",
         help="List available audio devices and exit"
     )
+    parser.add_argument(
+    "--record-folder",
+    type=str,
+    default=str(RECORD_FOLDER),
+    help="Folder to store recordings (default: data/recordings)"
+    )
     args = parser.parse_args()
 
     if args.list_audio_devices:
         print(sd.query_devices())
         exit(0)
 
-    main(args.ip, args.filename, args.freq, args.audio_device)
+    record(args.ip, args.name, args.freq, args.audio_device, args.record_folder)
+
+if __name__ == "__main__":
+    main()
