@@ -28,7 +28,7 @@ pip install -e .[dev,tools]
 This enables live editing, linting, testing, and access to all CLI tools.
 
 
-🖥 CLI Tools
+## 🖥 Record and replay Tools
 
 After installation, two commands are available:
 ### emotion-record
@@ -80,7 +80,7 @@ Arguments:
 
     --all-emotions: play all available recordings sequentially
 
-🎛 Tools
+## 🎛 Utility Tools
 ### rank.py
 
 Ranks all .wav files in a folder by duration.
@@ -105,12 +105,7 @@ python tools/trim_all.py
 
 ⚠️ This modifies files in-place.
 
-🧪 Testing & Development
-
-To install dev dependencies:
-```bash
-pip install -e .[dev,tools]
-```
+## 🧪 Testing & Development
 
 To auto-format code:
 ```bash
@@ -118,7 +113,7 @@ black . --line-length 128
 isort .
 ```
 
-📁 Folder Structure
+## 📁 Folder Structure
 ```
 reachy2_emotions/
 ├── data/                # Emotion recordings (.json + .wav)
@@ -130,17 +125,17 @@ reachy2_emotions/
 ├── pyproject.toml
 └── LICENSE
 ```
-🧬 Acknowledgements
+## 🧬 Acknowledgements
 
 Record/replay scripts inspired by [Claire’s work on demo_events](https://github.com/pollen-robotics/demo_events/tree/main).
 
 Developed by Pollen Robotics to explore expressive, communicative robots using Reachy2.
 
-📢 Contributions
+## 📢 Contributions
 
 Contributions, ideas, and feedback are welcome!
 Feel free to open issues or submit pull requests.
 
-🧾 License
+## 🧾 License
 
 This project is licensed under the terms of the Apache 2.0 licence.
