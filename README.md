@@ -17,7 +17,7 @@ This package provides CLI tools and utilities to capture synchronized motion and
 For regular users:
 
 ```bash
-pip install .[tools]
+pip install -e .[tools]
 ```
 
 For development:
