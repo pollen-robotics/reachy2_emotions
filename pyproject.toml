@@ -1,0 +1,48 @@
+[project]
+name = "reachy2_emotions"
+version = "0.1.0"
+description = "Reachy 2 Emotions package"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Pollen Robotics", email = "contact@pollen-robotics.com" }
+]
+urls = { "Homepage" = "https://github.com/pollen-robotics/reachy2_emotions" }
+
+dependencies = [
+  "numpy >=1.24.0, <=1.26.4",
+  "sounddevice",
+  "soundfile",
+  "Flask >=2.0.0",
+  "flask-cors",
+  "reachy2-sdk >=1.0.0, <2.0.0"
+]
+
+[project.optional-dependencies]
+tools = [
+  "soundfile"
+]
+dev = [
+  "black ==23.12.1",
+  "flake8 ==7.0.0",
+  "pytest ==7.4.3",
+  "coverage ==7.3.2",
+  "isort ==5.13.2",
+  "pdoc >=14.0.0, <=14.4.0"
+]
+
+[project.scripts]
+emotion-record = "reachy2_emotions.record_move:main"
+emotion-play = "reachy2_emotions.replay_move:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.flake8]
+exclude = "*test*"
+max-line-length = 128
+extend-ignore = ["E203"]
+max-complexity = 10
+

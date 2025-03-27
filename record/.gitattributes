@@ -1,2 +1,0 @@
-recordings/*.wav filter=lfs diff=lfs merge=lfs -text
-recordings/*.json filter=lfs diff=lfs merge=lfs -text
