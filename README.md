@@ -1,5 +1,20 @@
 # reachy2_emotions
 
+
+📦 Installing the Project
+
+For regular users:
+```
+pip install .[tools]
+```
+
+For contributors / development:
+```
+pip install -e .[dev,tools]
+```
+This enables live editing and access to dev tools like black, pytest, and documentation generators.
+
+
 ## Installation
 ```
 pip3 install sounddevice soundfile
