@@ -21,7 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 tools = [
-  "soundfile"  # Used by verif.py, trim_all.py, rank.py
+  "soundfile"
 ]
 dev = [
   "black ==23.12.1",
@@ -32,6 +32,10 @@ dev = [
   "pdoc >=14.0.0, <=14.4.0"
 ]
 
+[project.scripts]
+emotion-record = "reachy2_emotions.record_move:main"
+emotion-play = "reachy2_emotions.replay_move:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -41,3 +45,4 @@ exclude = "*test*"
 max-line-length = 128
 extend-ignore = ["E203"]
 max-complexity = 10
+

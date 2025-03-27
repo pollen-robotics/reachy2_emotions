@@ -17,6 +17,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import difflib
 import traceback
+import pathlib
 
 # ------------------------------------------------------------------------------
 # Logging configuration
@@ -24,7 +25,7 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Folder with recordings (JSON + corresponding WAV files)
-RECORD_FOLDER = "recordings"
+RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
 
 """
 TODOs
@@ -852,14 +853,13 @@ def print_available_emotions() -> None:
 
 # ------------------------------------------------------------------------------
 # Main entry point
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Replay Reachy's movements with recorded audio and/or run a Flask server for emotion requests. Example: \npython3 replay_move.py --ip localhost --filename abattu1"
     )
     parser.add_argument("--ip", type=str, default="localhost",
                         help="IP address of the robot")
-    parser.add_argument("--filename", type=str, default=None,
+    parser.add_argument("--name", type=str, default=None,
                         help="Name of the JSON recording file to replay (without .json extension)")
     parser.add_argument("--audio-device", type=str, default=None,
                         help="Identifier of the audio output device")
@@ -888,8 +888,11 @@ if __name__ == "__main__":
         print_available_emotions()
     elif args.server:
         run_server_mode(args.ip, args.audio_device, args.audio_offset, args.flask_port)
-    elif args.filename is not None:
-        run_cli_mode(args.ip, args.filename, args.audio_device, args.audio_offset)
+    elif args.name is not None:
+        run_cli_mode(args.ip, args.name, args.audio_device, args.audio_offset)
     else:
         parser.print_help()
         exit(1)
+
+if __name__ == "__main__":
+    main()
