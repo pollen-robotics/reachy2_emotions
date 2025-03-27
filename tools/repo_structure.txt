@@ -1,0 +1,9 @@
+.
+├── emotions_map.csv
+├── rank.bash
+├── rename_emotion_files.py
+├── repo_structure.txt
+├── trim_all.py
+└── verif.py
+
+0 directories, 6 files
