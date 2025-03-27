@@ -2,18 +2,18 @@ import argparse
 import datetime
 import json
 import os
+import pathlib
+import threading  # Added for scheduling the beep
 import time
+
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-import threading  # Added for scheduling the beep
-import pathlib
-
 from reachy2_sdk import ReachySDK  # type: ignore
-
 
 # Folder with recordings (JSON + corresponding WAV files)
 RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
+
 
 def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: str) -> None:
     # connect to Reachy
@@ -33,8 +33,8 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 
     # --- Setup Audio Recording ---
     sample_rate = 44100  # samples per second (you can adjust as needed)
-    channels = 1         # mono recording; use 2 for stereo
-    audio_frames = []    # will store chunks of recorded audio
+    channels = 1  # mono recording; use 2 for stereo
+    audio_frames = []  # will store chunks of recorded audio
 
     def audio_callback(indata, frames, time_info, status):
         if status:
@@ -43,12 +43,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
         audio_frames.append(indata.copy())
 
     try:
-        audio_stream = sd.InputStream(
-            device=audio_device,
-            channels=channels,
-            samplerate=sample_rate,
-            callback=audio_callback
-        )
+        audio_stream = sd.InputStream(device=audio_device, channels=channels, samplerate=sample_rate, callback=audio_callback)
         audio_stream.start()
         print("Audio recording started using device:", audio_stream.device)
     except Exception as e:
@@ -59,8 +54,8 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 
     # --- Schedule a beep sound 1 second after start ---
     def beep():
-        duration = 0.2       # Beep duration in seconds
-        freq_beep = 440      # Frequency in Hz
+        duration = 0.2  # Beep duration in seconds
+        freq_beep = 440  # Frequency in Hz
         t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
         beep_sound = 0.5 * np.sin(2 * np.pi * freq_beep * t)
         sd.play(beep_sound, sample_rate)
@@ -92,7 +87,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
             data["l_antenna"].append(l_antenna)
             data["r_antenna"].append(r_antenna)
 
-            time.sleep(1 / freq) # TODO should be adjusted to match the desired frequency
+            time.sleep(1 / freq)  # TODO should be adjusted to match the desired frequency
     except KeyboardInterrupt:
         # Stop the audio stream
         audio_stream.stop()
@@ -127,9 +122,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 def main():
     d = datetime.datetime.now()
     default_filename = f"recording_{d.strftime('%m%d_%H%M')}.json"
-    parser = argparse.ArgumentParser(
-        description="Record the movements of Reachy and voice from the microphone."
-    )
+    parser = argparse.ArgumentParser(description="Record the movements of Reachy and voice from the microphone.")
     parser.add_argument(
         "--ip",
         type=str,
@@ -150,21 +143,11 @@ def main():
     )
     # Audio device selection options:
     parser.add_argument(
-        "--audio-device",
-        type=str,
-        default=None,
-        help="Identifier of the audio input device (see --list-audio-devices)"
+        "--audio-device", type=str, default=None, help="Identifier of the audio input device (see --list-audio-devices)"
     )
+    parser.add_argument("--list-audio-devices", action="store_true", help="List available audio devices and exit")
     parser.add_argument(
-        "--list-audio-devices",
-        action="store_true",
-        help="List available audio devices and exit"
-    )
-    parser.add_argument(
-    "--record-folder",
-    type=str,
-    default=str(RECORD_FOLDER),
-    help="Folder to store recordings (default: data/recordings)"
+        "--record-folder", type=str, default=str(RECORD_FOLDER), help="Folder to store recordings (default: data/recordings)"
     )
     args = parser.parse_args()
 
@@ -173,6 +156,7 @@ def main():
         exit(0)
 
     record(args.ip, args.name, args.freq, args.audio_device, args.record_folder)
+
 
 if __name__ == "__main__":
     main()

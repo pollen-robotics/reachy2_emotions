@@ -1,17 +1,15 @@
-
-import pygame
-import time
 import math
-import numpy as np
-import traceback
-import threading
-import queue
-from reachy2_sdk import ReachySDK
-import numpy.typing as npt
-from reachy2_sdk.parts.joints_based_part import JointsBasedPart
-
-
 import os
+import queue
+import threading
+import time
+import traceback
+
+import numpy as np
+import numpy.typing as npt
+import pygame
+from reachy2_sdk import ReachySDK
+from reachy2_sdk.parts.joints_based_part import JointsBasedPart
 
 # To be able to use pygame in "headless" mode
 # set SDL to use the dummy NULL video driver, so it doesn't need a windowing system.
@@ -63,20 +61,20 @@ CTRL-C  or press CIRCLE on the controller to quit
 
 
 # These are integer values between 0 and 100
-TORQUE_LIMIT=100
-SPEED_LIMIT=100
-MAX_ANTENNA_ANGLE = 110 # to be checked
+TORQUE_LIMIT = 100
+SPEED_LIMIT = 100
+MAX_ANTENNA_ANGLE = 110  # to be checked
 ## Bunch of utility functions
 
 # IP_ADDRESS = "localhost"
 IP_ADDRESS = "192.168.50.218"
+
 
 def sign(x):
     if x >= 0:
         return 1
     else:
         return -1
-
 
 
 def hello(reachy: ReachySDK) -> None:
@@ -88,6 +86,7 @@ def hello(reachy: ReachySDK) -> None:
     reachy.r_arm.goto([0, -40, -70, -115, 0, 20, 90], duration=0.5, interpolation_mode="linear")
     reachy.r_arm.goto([0, -40, -70, -120, 0, -20, 90], duration=0.5, interpolation_mode="linear")
     reachy.r_arm.goto([0, -40, -70, -115, 0, 20, 90], duration=0.5, interpolation_mode="linear", wait=True)
+
 
 def sweeting(reachy: ReachySDK) -> None:
     reachy.r_arm.gripper.close()
@@ -101,6 +100,7 @@ def sweeting(reachy: ReachySDK) -> None:
     reachy.r_arm.goto([0, 10, -10, 0, 0, 0, 0])
     time.sleep(0.5)
     reachy.r_arm.gripper.open()
+
 
 def discover(reachy: ReachySDK) -> None:
     reachy.head.look_at(0.5, -0.1, -0.2)
@@ -163,6 +163,7 @@ def discover(reachy: ReachySDK) -> None:
     reachy.r_arm.goto([-15, 7, -8, -125, 3, -27, 0], duration=0.3)
     reachy.r_arm.goto([-20, 7, -8, -130, 3, -16, 0], duration=0.3, wait=True)
 
+
 def check_grippers(reachy: ReachySDK) -> None:
     reachy.head.look_at(0.5, -0.1, -0.2, duration=1.5)
     r_arm_gotoid = reachy.r_arm.goto([5, 7, 9, -115, 0, 0, 0], duration=1.5)
@@ -190,6 +191,7 @@ def check_grippers(reachy: ReachySDK) -> None:
     reachy.r_arm.gripper.open()
     reachy.l_arm.gripper.open()
 
+
 def happy(reachy: ReachySDK) -> None:
     reachy.head.goto([20, 0, 0], duration=0.7)
     time.sleep(0.2)
@@ -199,6 +201,7 @@ def happy(reachy: ReachySDK) -> None:
     reachy.head.goto([-10, -7, 0], duration=1)
     reachy.head.goto([0, 0, 0], wait=True)
     x.join()
+
 
 def sad(reachy: ReachySDK) -> None:
     reachy.head.goto([0, 25, 0])
@@ -214,6 +217,7 @@ def sad(reachy: ReachySDK) -> None:
     reachy.head.goto([0, 0, 0], wait=True)
     x.join()
 
+
 def curious(reachy: ReachySDK) -> None:
     reachy.head.goto([10, 0, 0], duration=0.7)
     time.sleep(0.2)
@@ -223,6 +227,7 @@ def curious(reachy: ReachySDK) -> None:
     time.sleep(1)
     reachy.head.goto([0, 0, 0], duration=1, wait=True)
     x.join()
+
 
 def curious2(reachy: ReachySDK) -> None:
     reachy.head.goto([-16, -2, -3], duration=1)
@@ -234,36 +239,44 @@ def curious2(reachy: ReachySDK) -> None:
     reachy.head.goto([0, 0, 0], duration=1, wait=True)
     x.join()
 
+
 def play_happy(reachy):
     print("Play happy")
     happy(reachy)
+
 
 def play_sad(reachy):
     print("Play sad")
     sad(reachy)
 
+
 def play_curious(reachy):
     print("Play curious")
     curious(reachy)
 
+
 def play_curious2(reachy):
     print("Play curious 2")
     curious2(reachy)
+
 
 def play_hello(reachy):
     print("Play Hello ...")
     hello(reachy)
     reachy.goto_posture("default", wait=True)
 
+
 def play_sweeting(reachy):
     print("Play sweeting ...")
     sweeting(reachy)
     reachy.goto_posture("default", wait=True)
 
+
 def play_discover(reachy):
     print("Play discover ...")
     discover(reachy)
     reachy.goto_posture("default", wait=True)
+
 
 def play_check_grippers(reachy):
     print("Play check grippers ...")
@@ -271,7 +284,7 @@ def play_check_grippers(reachy):
     reachy.goto_posture("default", wait=True)
 
 
-class JoyTeleop():
+class JoyTeleop:
     def __init__(self):
         print("Starting zuuu_teleop_joy!")
 
@@ -293,12 +306,12 @@ class JoyTeleop():
         self.current_command = None
         self.command_lock = threading.Lock()
         self.antenna_vibration_offset = 0.0
-        
+
         self.emergency_reachy = ReachySDK(host=IP_ADDRESS)
 
         if not self.emergency_reachy.is_connected:
             exit("Reachy is not connected.")
-        
+
         # self.emergency_reachy.mobile_base._set_drive_mode("cmd_vel")
         # self.emergency_reachy.mobile_base.reset_odometry()
         self.emergency_reachy.turn_on()
@@ -306,22 +319,21 @@ class JoyTeleop():
         self.emergency_reachy.head.l_antenna.turn_on()
         print("ReachySDK initialized and turned on.")
         # set_speed_and_torque_limits(self.emergency_reachy, torque_limit=TORQUE_LIMIT, speed_limit=SPEED_LIMIT)
-        
+
         self.prev_joy2 = -1
         self.prev_joy5 = -1
         self.left_joy = 0.0
         self.right_joy = 0.0
         self.prev_hat = (0, 0)
-                
+
         self.sdk_command_queue = queue.Queue()
 
         # Start ReachySDK in a separate thread
         self.sdk_thread = threading.Thread(target=self.run_reachy_sdk, daemon=True)
         self.sdk_thread.start()
-        
+
         print(msg)
-        
-        
+
     def set_command(self, command):
         """Set a new command if none is currently being executed."""
         with self.command_lock:
@@ -334,16 +346,15 @@ class JoyTeleop():
         """Clear the current command, e.g., during an emergency stop."""
         with self.command_lock:
             self.current_command = None
-            
+
     def _vibration_loop(self):
         dur = 2
         t = np.linspace(0, dur, dur * 100)
         pos = 10 * np.sin(2 * np.pi * 5 * t)
-        
+
         for p in pos:
             self.antenna_vibration_offset = p
             time.sleep(0.01)
-
 
     def start_vibration(self):
         """Starts the vibration thread if not already running."""
@@ -351,7 +362,6 @@ class JoyTeleop():
         self._vibration_thread = threading.Thread(target=self._vibration_loop)
         self._vibration_thread.daemon = True
         self._vibration_thread.start()
-
 
     def run_reachy_sdk(self):
         """Thread for managing ReachySDK client."""
@@ -361,29 +371,29 @@ class JoyTeleop():
             if not reachy.is_connected:
                 exit("Reachy is not connected.")
 
-
             while True:
                 time.sleep(0.01)  # Avoid busy waiting
                 # Gachettes
                 # reachy.head.l_antenna.goal_position = (self.prev_joy2 + 1)*MAX_ANTENNA_ANGLE
                 # reachy.head.r_antenna.goal_position = (self.prev_joy5 + 1)*MAX_ANTENNA_ANGLE
                 # joy
-                new_l = -(self.left_joy)*MAX_ANTENNA_ANGLE - self.antenna_vibration_offset
-                new_r = (self.right_joy)*MAX_ANTENNA_ANGLE + self.antenna_vibration_offset
-                if abs(new_l - reachy.head.l_antenna.goal_position) > 0.1 or abs(new_r - reachy.head.r_antenna.goal_position) > 0.1:  
+                new_l = -(self.left_joy) * MAX_ANTENNA_ANGLE - self.antenna_vibration_offset
+                new_r = (self.right_joy) * MAX_ANTENNA_ANGLE + self.antenna_vibration_offset
+                if (
+                    abs(new_l - reachy.head.l_antenna.goal_position) > 0.1
+                    or abs(new_r - reachy.head.r_antenna.goal_position) > 0.1
+                ):
                     reachy.head.l_antenna.goal_position = new_l
                     reachy.head.r_antenna.goal_position = new_r
                     reachy.send_goal_positions(check_positions=False)
                 # print(f"antenna L, R: {reachy.head.l_antenna.goal_position}, {reachy.head.r_antenna.goal_position}")
-                
+
                 with self.command_lock:
                     command = self.current_command
                     self.current_command = None  # Clear the command after reading
 
                 if command is None:
                     continue
-                
-
 
                 # Execute the command
                 try:
@@ -436,7 +446,7 @@ class JoyTeleop():
                     )
                 if self.j.get_button(5):  # r1
                     self.start_vibration()
-                    
+
                     # self.rot_speed_ratio = max(0.0, self.rot_speed_ratio - 0.2)
                     # print(
                     #     "max translational speed: {:.1f}m/s, max rotational speed: {:.1f}rad/s".format(
@@ -451,10 +461,10 @@ class JoyTeleop():
                     self.set_command("play_discover")
                 if self.j.get_button(1):
                     self.set_command("play_sweeting")
-                
+
             elif event.type == pygame.JOYAXISMOTION:
-                curr_joy2 = self.j.get_axis(2) # left (LT). -1 when not pressed, 1 when pressed
-                curr_joy5 = self.j.get_axis(5) # right (RT). -1 when not pressed, 1 when pressed
+                curr_joy2 = self.j.get_axis(2)  # left (LT). -1 when not pressed, 1 when pressed
+                curr_joy5 = self.j.get_axis(5)  # right (RT). -1 when not pressed, 1 when pressed
                 self.left_joy = self.j.get_axis(1)
                 self.right_joy = self.j.get_axis(4)
                 # print(f"LT: {curr_joy2}, RT: {curr_joy5}, left: {left_joy}, right: {right_joy}")
@@ -465,16 +475,16 @@ class JoyTeleop():
                 #     pass
                 self.prev_joy2 = curr_joy2
                 self.prev_joy5 = curr_joy5
-            
+
             elif event.type == pygame.JOYHATMOTION:
                 curr_hat = self.j.get_hat(0)
-                if curr_hat == (0, 1) and self.prev_hat!=(0, 1):
+                if curr_hat == (0, 1) and self.prev_hat != (0, 1):
                     self.set_command("play_happy")
-                if curr_hat == (0, -1) and self.prev_hat!=(0, -1):
+                if curr_hat == (0, -1) and self.prev_hat != (0, -1):
                     self.set_command("play_sad")
-                if curr_hat == (1, 0) and self.prev_hat!=(1, 0):
+                if curr_hat == (1, 0) and self.prev_hat != (1, 0):
                     self.set_command("play_curious")
-                if curr_hat == (-1, 0) and self.prev_hat!=(-1, 0):
+                if curr_hat == (-1, 0) and self.prev_hat != (-1, 0):
                     self.set_command("play_curious2")
                 self.prev_hat = curr_hat
 
@@ -509,7 +519,7 @@ class JoyTeleop():
         for i in range(buttons):
             button = self.j.get_button(i)
             print("Button {:>2} value: {}".format(i, button))
-        
+
         time.sleep(0.5)
 
     def speeds_from_joystick(self):
@@ -551,7 +561,7 @@ class JoyTeleop():
 
 def main():
     node = JoyTeleop()
-    
+
     while True:
         node.main_tick()
         time.sleep((0.01))
@@ -559,5 +569,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-    

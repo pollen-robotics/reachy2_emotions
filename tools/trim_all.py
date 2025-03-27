@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-import os
 import argparse
+import os
+
 import soundfile as sf
+
 
 def trim_wav_files(folder: str, trim_duration: float = 1.6) -> None:
     """
@@ -18,7 +20,7 @@ def trim_wav_files(folder: str, trim_duration: float = 1.6) -> None:
         return
 
     for filename in os.listdir(folder):
-        if filename.lower().endswith('.wav'):
+        if filename.lower().endswith(".wav"):
             file_path = os.path.join(folder, filename)
             try:
                 data, samplerate = sf.read(file_path)
@@ -34,20 +36,12 @@ def trim_wav_files(folder: str, trim_duration: float = 1.6) -> None:
             except Exception as e:
                 print(f"❌ Error processing {filename}: {e}")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Trim the beginning of each .wav file in a folder."
-    )
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Trim the beginning of each .wav file in a folder.")
     parser.add_argument(
-        '--folder', '-f',
-        default='data/recordings',
-        help="Path to folder containing .wav files (default: data/recordings)"
+        "--folder", "-f", default="data/recordings", help="Path to folder containing .wav files (default: data/recordings)"
     )
-    parser.add_argument(
-        '--duration', '-d',
-        type=float,
-        default=1.6,
-        help="Trim duration in seconds (default: 1.6)"
-    )
+    parser.add_argument("--duration", "-d", type=float, default=1.6, help="Trim duration in seconds (default: 1.6)")
     args = parser.parse_args()
     trim_wav_files(args.folder, args.duration)

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import os
 import argparse
+import os
+
 
 def verify_pairs(folder: str) -> None:
     if not os.path.isdir(folder):
@@ -32,11 +33,14 @@ def verify_pairs(folder: str) -> None:
     if not missing_json and not missing_wav:
         print("\n✅ All files are consistent. No missing pairs detected!")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Verify .json/.wav file pairing in a folder.")
     parser.add_argument(
-        "--folder", "-f", default="data/recordings",
-        help="Path to the folder containing emotion recordings (default: data/recordings)"
+        "--folder",
+        "-f",
+        default="data/recordings",
+        help="Path to the folder containing emotion recordings (default: data/recordings)",
     )
     args = parser.parse_args()
     verify_pairs(args.folder)
