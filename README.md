@@ -131,7 +131,7 @@ reachy2_emotions/
 ```
 🧬 Acknowledgements
 
-Inspired by Claire’s early work on demo_events.
+Record/replay scripts inspired by [Claire’s work on demo_events](https://github.com/pollen-robotics/demo_events/tree/main).
 
 Developed by Pollen Robotics to explore expressive, communicative robots using Reachy2.
 
@@ -139,6 +139,7 @@ Developed by Pollen Robotics to explore expressive, communicative robots using R
 
 Contributions, ideas, and feedback are welcome!
 Feel free to open issues or submit pull requests.
+
 🧾 License
 
 This project is licensed under the terms of the Apache 2.0 licence.
