@@ -59,3 +59,17 @@ Checks that every `.json` file has a corresponding `.wav` file (and vice versa) 
 
 ```bash
 python3 tools/verif.py
+```
+
+### `trim_all.py`
+
+Trims the first seconds of each `.wav` file in a folder. Useful if there's silence or unwanted audio at the beginning of your emotion recordings.
+-> Typically used to remove the first ~1.6 seconds of autio before the "BIP" that's used in the record.py to synchronize.
+
+⚠️ This overwrites files in-place!
+
+#### Usage:
+
+```bash
+python3 tools/trim_all.py
+```
