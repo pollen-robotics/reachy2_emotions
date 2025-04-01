@@ -9,6 +9,9 @@
 Record, replay, and experiment with expressive emotions on Reachy2!
 This package provides CLI tools and utilities to capture synchronized motion and audio, replay them with smooth transitions, and serve emotion playback over a web API.
 
+![CI](https://github.com/pollen-robotics/reachy2_emotions/actions/workflows/lint.yml/badge.svg)
+
+
 ---
 
 

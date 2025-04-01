@@ -46,3 +46,9 @@ max-line-length = 128
 extend-ignore = ["E203"]
 max-complexity = 10
 
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 128
+
