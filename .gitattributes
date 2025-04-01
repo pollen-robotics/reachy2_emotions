@@ -1,3 +1,2 @@
 docs/gifs/*.gif filter=lfs diff=lfs merge=lfs -text
 data/recordings/*.wav filter=lfs diff=lfs merge=lfs -text
-data/recordings/*.json filter=lfs diff=lfs merge=lfs -text
