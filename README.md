@@ -47,12 +47,18 @@ After installation, two commands are available:
 Replays recorded joint trajectories and synchronized audio, with smooth interpolation and idle animations at the end.
 
 ```bash
-emotion-play --ip 192.168.1.42 --name amazed1
+emotion-play --name amazed1
 ```
 
-Arguments:
+List available emotions and play around!
 
-    --ip: IP of Reachy
+```bash
+emotion-play --list
+```
+
+Arguments of emotion-play:
+
+    --ip: IP of Reachy (default: localhost)
 
     --name: name of the recording (without extension)
 
@@ -74,10 +80,10 @@ Arguments:
 
 Records Reachy’s joint motions and microphone audio into .json and .wav files.
 ```bash
-emotion-record --ip 192.168.1.42 --filename amazed1 --audio-device "USB Audio Device"
+emotion-record --filename devastated2
 ```
 
-Arguments:
+Arguments emotion-record:
 
     --ip: IP of Reachy (default: localhost)
 
