@@ -40,26 +40,7 @@ This enables live editing, linting, testing, and access to all CLI tools.
 ## 🖥 Record and replay Tools
 
 After installation, two commands are available:
-### emotion-record
 
-Records Reachy’s joint motions and microphone audio into .json and .wav files.
-```bash
-emotion-record --ip 192.168.1.42 --filename amazed1 --audio-device "USB Audio Device"
-```
-
-Arguments:
-
-    --ip: IP of Reachy (default: localhost)
-
-    --filename: base name for output files
-
-    --freq: recording frequency (default: 100Hz)
-
-    --audio-device: name or ID of the audio input device
-
-    --list-audio-devices: list available audio input devices
-
-    --record-folder: optional override for output folder
 
 ### emotion-play
 
@@ -88,6 +69,28 @@ Arguments:
     --list: list available emotions
 
     --all-emotions: play all available recordings sequentially
+
+### emotion-record
+
+Records Reachy’s joint motions and microphone audio into .json and .wav files.
+```bash
+emotion-record --ip 192.168.1.42 --filename amazed1 --audio-device "USB Audio Device"
+```
+
+Arguments:
+
+    --ip: IP of Reachy (default: localhost)
+
+    --filename: base name for output files
+
+    --freq: recording frequency (default: 100Hz)
+
+    --audio-device: name or ID of the audio input device
+
+    --list-audio-devices: list available audio input devices
+
+    --record-folder: optional override for output folder
+
 
 ## 🎛 Utility Tools
 ### rank.py
