@@ -97,6 +97,9 @@ Arguments emotion-record:
 
     --record-folder: optional override for output folder
 
+## Full Demo
+To run the full demo where an LLM listens and Reachy reacts, follow the instructions here:
+https://github.com/pollen-robotics/openai-realtime-console
 
 ## 🎛 Utility Tools
 ### rank.py
