@@ -17,6 +17,8 @@ This package provides CLI tools and utilities to capture synchronized motion and
 
 ## 🛠 Installation
 
+Clone this repository. If you're using Reachy2 Docker stack, we recommend installing this outside the container to avoid host<->container sound issues.
+
 For regular users:
 
 ```bash
