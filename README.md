@@ -104,6 +104,13 @@ To run the full demo where an LLM listens and Reachy reacts, follow the instruct
 https://github.com/pollen-robotics/openai-realtime-console
 
 ## 🎛 Utility Tools
+### plot_recording.py
+Plot utility to inspect recordings. Can plot all the joints, only a part (e.g "r_arm"), or only a joint (e.g. "r_arm:1")
+```bash
+python3 plot_recording.py ../data/recordings/furious1.json --part r_arm
+```
+![image](docs/plot_example1.jpeg)
+
 ### rank.py
 
 Ranks all .wav files in a folder by duration.
