@@ -39,7 +39,7 @@ def rank_wav_files(folder: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Rank .wav files by duration (descending).")
     parser.add_argument(
-        "--folder", "-f", default="data/recordings", help="Folder containing .wav files (default: data/recordings)"
+        "--folder", "-f", default="../data/recordings", help="Folder containing .wav files (default: data/recordings)"
     )
     args = parser.parse_args()
     rank_wav_files(args.folder)

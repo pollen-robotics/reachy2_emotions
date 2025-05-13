@@ -40,7 +40,7 @@ def trim_wav_files(folder: str, trim_duration: float = 1.6) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trim the beginning of each .wav file in a folder.")
     parser.add_argument(
-        "--folder", "-f", default="data/recordings", help="Path to folder containing .wav files (default: data/recordings)"
+        "--folder", "-f", default="../data/recordings", help="Path to folder containing .wav files (default: data/recordings)"
     )
     parser.add_argument("--duration", "-d", type=float, default=1.6, help="Trim duration in seconds (default: 1.6)")
     args = parser.parse_args()

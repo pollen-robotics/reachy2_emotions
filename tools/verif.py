@@ -39,7 +39,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--folder",
         "-f",
-        default="data/recordings",
+        default="../data/recordings",
         help="Path to the folder containing emotion recordings (default: data/recordings)",
     )
     args = parser.parse_args()
