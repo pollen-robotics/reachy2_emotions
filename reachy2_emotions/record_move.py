@@ -11,8 +11,7 @@ import sounddevice as sd
 import soundfile as sf
 from reachy2_sdk import ReachySDK  # type: ignore
 
-# Folder with recordings (JSON + corresponding WAV files)
-RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
+from reachy2_emotions.utils import RECORD_FOLDER
 
 
 def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: str) -> None:
