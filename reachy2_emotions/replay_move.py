@@ -16,18 +16,18 @@ import sounddevice as sd
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from reachy2_sdk import ReachySDK  # type: ignore
+
 from reachy2_emotions.utils import (
     RECORD_FOLDER,
+    get_last_recording,
+    interruptible_sleep,
+    joint_distance_with_new_pose,
+    lerp,
     list_available_emotions,
     load_data,
     play_audio,
-    joint_distance_with_new_pose,
-    lerp,
-    interruptible_sleep,
-    get_last_recording,
     print_available_emotions,
 )
-
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -174,10 +174,9 @@ class EmotionPlayer:
 
         # Check current positions to adapt the duration of the initial move.
         try:
-            # max_dist = distance_with_new_pose(self.reachy, data) 
+            # max_dist = distance_with_new_pose(self.reachy, data)
             max_joint_diff = joint_distance_with_new_pose(self.reachy, data)
             first_duration = max_joint_diff / (self.max_joint_speed)
-            
 
         except Exception as e:
             logging.error(f"Error computing distance: {e}. Using default duration.")
@@ -370,7 +369,7 @@ class EmotionPlayer:
             if self.audio_thread and self.audio_thread.is_alive():
                 # sd.stop()
                 self.audio_thread.join()
-            logging.debug("End Finally of replay") # Typo was in original, kept it as per "do only this change"
+            logging.debug("End Finally of replay")  # Typo was in original, kept it as per "do only this change"
 
     def stop(self):
         if self.thread and self.thread.is_alive():
@@ -389,6 +388,7 @@ class EmotionPlayer:
 
 # ------------------------------------------------------------------------------
 # Modes
+
 
 def run_cli_mode(ip: str, filename: Optional[str], audio_device: Optional[str], audio_offset: float):
     """

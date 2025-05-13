@@ -10,6 +10,7 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 from reachy2_sdk import ReachySDK  # type: ignore
+
 from reachy2_emotions.utils import RECORD_FOLDER
 
 

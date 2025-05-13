@@ -94,6 +94,7 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
 
     return np.max([distance_l_arm, distance_r_arm])
 
+
 def get_current_joint_positions_per_tag(reachy: ReachySDK) -> dict:
     """Retrieve current joint positions matching the recorded tags. All values are lists, even single joints."""
     return {
@@ -101,7 +102,7 @@ def get_current_joint_positions_per_tag(reachy: ReachySDK) -> dict:
         "r_arm": [joint.present_position for name, joint in list(reachy.r_arm.joints.items())[:-1]],  # Exclude gripper
         "l_hand": [reachy.l_arm.joints["gripper"].present_position],  # Single value in a list on purpose
         "r_hand": [reachy.r_arm.joints["gripper"].present_position],
-        "head": [joint.present_position for name, joint in list(reachy.head.joints.items())[:3]], 
+        "head": [joint.present_position for name, joint in list(reachy.head.joints.items())[:3]],
         "l_antenna": [reachy.head.joints["l_antenna"].present_position],
         "r_antenna": [reachy.head.joints["r_antenna"].present_position],
     }
@@ -121,8 +122,9 @@ def joint_distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
             raise ValueError(f"Unknown tag '{tag}'")
 
         if len(first_recorded_values) != len(current_values):
-            raise ValueError(f"Mismatch in joint count for '{tag}': "
-                             f"expected {len(current_values)}, got {len(first_recorded_values)}")
+            raise ValueError(
+                f"Mismatch in joint count for '{tag}': " f"expected {len(current_values)}, got {len(first_recorded_values)}"
+            )
 
         distances = np.abs(np.array(current_values) - np.array(first_recorded_values))
         max_dist = max(max_dist, np.max(distances))

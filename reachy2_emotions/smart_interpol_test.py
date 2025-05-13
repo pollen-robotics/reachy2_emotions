@@ -183,27 +183,21 @@ def _replay_thread_smart_interpol(self, filename: str):
             joints = list(self.reachy.l_arm.joints.values())
             for i in range(len(joints)):
                 current_goal = joints[i].goal_position
-                new_goal = update_goal(
-                    data["l_arm"], current_time, dt_loop, current_goal, self.max_joint_speed, joint_index=i
-                )
+                new_goal = update_goal(data["l_arm"], current_time, dt_loop, current_goal, self.max_joint_speed, joint_index=i)
                 joints[i].goal_position = new_goal
 
             # Update right arm joints.
             joints = list(self.reachy.r_arm.joints.values())
             for i in range(len(joints)):
                 current_goal = joints[i].goal_position
-                new_goal = update_goal(
-                    data["r_arm"], current_time, dt_loop, current_goal, self.max_joint_speed, joint_index=i
-                )
+                new_goal = update_goal(data["r_arm"], current_time, dt_loop, current_goal, self.max_joint_speed, joint_index=i)
                 joints[i].goal_position = new_goal
 
             # Update head joints.
             joints = list(self.reachy.head.joints.values())
             for i in range(len(joints)):
                 current_goal = joints[i].goal_position
-                new_goal = update_goal(
-                    data["head"], current_time, dt_loop, current_goal, self.max_joint_speed, joint_index=i
-                )
+                new_goal = update_goal(data["head"], current_time, dt_loop, current_goal, self.max_joint_speed, joint_index=i)
                 joints[i].goal_position = new_goal
 
             # Update left gripper.
