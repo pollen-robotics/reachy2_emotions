@@ -320,11 +320,11 @@ class EmotionPlayer:
             logging.error("Error computing distance: %s", e)
             max_dist = 0
         # first_duration = max_dist * 5 # TODO: do
-        first_duration = max_dist / self.max_joint_speed
+        # first_duration = 10 * max_dist / self.max_joint_speed
+        first_duration = 0.3
+        
         logging.info("Computed initial move duration: %.2f seconds", first_duration)
 
-        # For now we set a fixed short duration.
-        # first_duration = 0.5
 
         start_event = threading.Event()
         self.audio_thread = None
