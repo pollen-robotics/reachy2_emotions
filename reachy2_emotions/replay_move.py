@@ -59,7 +59,7 @@ class EmotionPlayer:
             self.reachy = ReachySDK(host=self.ip)
 
         except Exception as e:
-            logging.error("Error connecting to Reachy in constructor: %s", e)
+            logging.error(f"Error connecting to Reachy in constructor: {e}")
             self.reachy = None
             exit(1)
         try:
@@ -71,7 +71,7 @@ class EmotionPlayer:
             self.reachy.head.l_antenna.turn_on()
             logging.info("Turn on done")
         except Exception as e:
-            logging.error("Error turning on Reachy: %s", e)
+            logging.error(f"Error turning on Reachy: {e}")
             return
         # NEW: add a send lock and idle thread controls.
         self.send_lock = threading.Lock()
@@ -136,7 +136,7 @@ class EmotionPlayer:
         logging.info("Idle animation loop stopped.")
 
     def _replay_thread(self, filename: str):
-        logging.info("Starting emotion playback for %s", filename)
+        logging.info(f"Starting emotion playback for {filename}")
         if self.reachy is None:
             logging.error("No valid Reachy instance available.")
             return
@@ -154,23 +154,23 @@ class EmotionPlayer:
             close_matches = difflib.get_close_matches(base_name, available_emotions, n=1, cutoff=0.6)
             if close_matches:
                 new_filename = close_matches[0] + ".json"
-                logging.warning("Recording file %s not found; using closest match %s", filename, new_filename)
+                logging.warning(f"Recording file {filename} not found; using closest match {new_filename}")
                 filename = new_filename
                 path = os.path.join(self.record_folder, filename)
             else:
-                logging.error("Recording file %s not found and no close match available.", path)
+                logging.error(f"Recording file {path} not found and no close match available.")
                 return
         try:
             data, timeframe = load_data(path)
         except Exception as e:
-            logging.error("Error loading data from %s: %s", path, e)
+            logging.error(f"Error loading data from {path}: {e}")
             return
 
         # Determine corresponding audio file.
         audio_file = os.path.splitext(path)[0] + ".wav"
         audio_available = os.path.exists(audio_file)
         if audio_available:
-            logging.info("Found corresponding audio file: %s", audio_file)
+            logging.info(f"Found corresponding audio file: {audio_file}")
         else:
             logging.info("No audio file found; only motion replay will be executed.")
 
@@ -181,13 +181,13 @@ class EmotionPlayer:
             logging.info(f"max_dist = {max_dist}")
 
         except Exception as e:
-            logging.error("Error computing distance: %s", e)
+            logging.error(f"Error computing distance: {e}")
             max_dist = 0
         # first_duration = max_dist * 5 # TODO: do
         # first_duration = 10 * max_dist / self.max_joint_speed
         first_duration = 0.3
 
-        logging.info("Computed initial move duration: %.2f seconds", first_duration)
+        logging.info(f"Computed initial move duration: {first_duration:.2f} seconds")
 
         start_event = threading.Event()
         self.audio_thread = None
@@ -237,14 +237,14 @@ class EmotionPlayer:
                     time.sleep(0.01)
             logging.info("First position reached.")
         except Exception as e:
-            logging.error("Error moving to initial position: %s", e)
+            logging.error(f"Error moving to initial position: {e}")
             return
 
         start_event.set()
 
         if self.audio_offset < 0:
             wait_time = abs(self.audio_offset)
-            logging.info("Waiting %s seconds before starting motion replay to allow audio to lead.", wait_time)
+            logging.info(f"Waiting {wait_time} seconds before starting motion replay to allow audio to lead.")
             interruptible_sleep(wait_time, self.stop_event)
             if self.stop_event.is_set():
                 logging.info("Emotion playback interrupted during audio lead wait.")
@@ -366,9 +366,9 @@ class EmotionPlayer:
                     time.sleep(margin)
 
             else:
-                logging.info("End of the recording. Replay duration: %.2f seconds", time.time() - t0)
+                logging.info(f"End of the recording. Replay duration: {time.time() - t0:.2f} seconds")
         except Exception as e:
-            logging.error("Error during replay: %s", e)
+            logging.error(f"Error during replay: {e}")
         finally:
             logging.info(
                 f"Finally of replay. if self.audio_thread and self.audio_thread.is_alive() = {self.audio_thread and self.audio_thread.is_alive()}"
@@ -376,7 +376,7 @@ class EmotionPlayer:
             if self.audio_thread and self.audio_thread.is_alive():
                 # sd.stop()
                 self.audio_thread.join()
-            logging.info(f"Endend Finally of replay")
+            logging.info("Endend Finally of replay") # Typo was in original, kept it as per "do only this change"
 
     def stop(self):
         if self.thread and self.thread.is_alive():
@@ -407,7 +407,7 @@ def run_cli_mode(ip: str, filename: Optional[str], audio_device: Optional[str], 
             last = get_last_recording(RECORD_FOLDER)
             filename = os.path.splitext(last)[0]
         except Exception as e:
-            logging.error("Error retrieving last recording: %s", e)
+            logging.error(f"Error retrieving last recording: {e}")
             return
     player.play_emotion(filename)
     if player.thread:
@@ -435,9 +435,9 @@ def run_server_mode(ip: str, audio_device: Optional[str], audio_offset: float, f
         thought_process = data.get("thought_process", "")
         emotion_name = data.get("emotion_name", "")
         logging.info("Executing play_emotion:")
-        logging.info("Input text: %s", input_text)
-        logging.info("Thought process: %s", thought_process)
-        logging.info("Emotion: %s", emotion_name)
+        logging.info(f"Input text: {input_text}")
+        logging.info(f"Thought process: {thought_process}")
+        logging.info(f"Emotion: {emotion_name}")
 
         # Interrupt current playback and start new one.
         player.play_emotion(emotion_name)
@@ -457,15 +457,15 @@ def run_all_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: fl
     Each emotion is fully played (i.e. its playback thread is joined)
     before moving on to the next one.
     """
-    player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True, verbose=False)
+    player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
     emotions = list_available_emotions(RECORD_FOLDER)
     if not emotions:
-        logging.error("No available emotions found in %s", RECORD_FOLDER)
+        logging.error(f"No available emotions found in {RECORD_FOLDER}")
         return
 
     for emotion in emotions:
         print("\n" + "=" * 40)
-        print("==== PLAYING EMOTION: {} ====".format(emotion.upper()))
+        print(f"==== PLAYING EMOTION: {emotion.upper()} ====")
         print("=" * 40 + "\n")
         player.play_emotion(emotion)
         if player.thread:
