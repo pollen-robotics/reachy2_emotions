@@ -25,8 +25,8 @@ def print_available_emotions() -> None:
     """
 
     emotions = list_available_emotions(RECORD_FOLDER)
-    print("Available emotions:")
-    print(emotions)
+    logging.info("Available emotions:")
+    logging.info(emotions)
 
 
 def lerp(v0, v1, alpha):
@@ -72,7 +72,7 @@ def load_data(path: str) -> Tuple[dict, float]:
     """Load the JSON recording and compute the timeframe between frames."""
     with open(path, "r") as f:
         data = json.load(f)
-    logging.info("Data loaded from %s", path)
+    logging.debug("Data loaded from %s", path)
     if len(data["time"]) < 2:
         raise ValueError("Insufficient time data in the recording.")
     timeframe = (data["time"][-1] - data["time"][0]) / len(data["time"])
@@ -94,17 +94,42 @@ def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
 
     return np.max([distance_l_arm, distance_r_arm])
 
+def get_current_joint_positions_per_tag(reachy: ReachySDK) -> dict:
+    """Retrieve current joint positions matching the recorded tags. All values are lists, even single joints."""
+    return {
+        "l_arm": [joint.present_position for name, joint in list(reachy.l_arm.joints.items())[:-1]],  # Exclude gripper
+        "r_arm": [joint.present_position for name, joint in list(reachy.r_arm.joints.items())[:-1]],  # Exclude gripper
+        "l_hand": [reachy.l_arm.joints["gripper"].present_position],  # Single value in a list on purpose
+        "r_hand": [reachy.r_arm.joints["gripper"].present_position],
+        "head": [joint.present_position for name, joint in list(reachy.head.joints.items())[:3]], 
+        "l_antenna": [reachy.head.joints["l_antenna"].present_position],
+        "r_antenna": [reachy.head.joints["r_antenna"].present_position],
+    }
+
 
 def joint_distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
-    """Similar to distance_with_new_pose but returns the max angle distance that any joint must travel to reach the new pose."""
-    max_dist = 0
-    for group, joints in [("l_arm", reachy.l_arm.joints), ("r_arm", reachy.r_arm.joints), ("head", reachy.head.joints)]:
-        idx = -1
-        for name, joint in joints.items():
-            idx += 1
-            dist = np.abs(joint.present_position - data[group][0][idx])
-            if dist > max_dist:
-                max_dist = dist
+    """Compute the maximum absolute difference between recorded and current joint positions."""
+    current_positions = get_current_joint_positions_per_tag(reachy)
+
+    max_dist_per_tag = {}
+    for tag, current_values in current_positions.items():
+        max_dist = 0
+        first_recorded_values = data.get(tag)[0]
+        if isinstance(first_recorded_values, float):
+            first_recorded_values = [first_recorded_values]
+        if current_values is None:
+            raise ValueError(f"Unknown tag '{tag}'")
+
+        if len(first_recorded_values) != len(current_values):
+            raise ValueError(f"Mismatch in joint count for '{tag}': "
+                             f"expected {len(current_values)}, got {len(first_recorded_values)}")
+
+        distances = np.abs(np.array(current_values) - np.array(first_recorded_values))
+        max_dist = max(max_dist, np.max(distances))
+        max_dist_per_tag[tag] = max_dist
+    # Only considering the arms and head for now
+    max_dist = max(max_dist_per_tag["l_arm"], max_dist_per_tag["r_arm"], max_dist_per_tag["head"])
+
     return max_dist
 
 
@@ -119,24 +144,24 @@ def play_audio(
         data, sample_rate = sf.read(audio_file, dtype="float32")
         if sample_rate != 44100:
             logging.warning("Recorded sample rate (%s) differs from default (44100).", sample_rate)
-        logging.info("Audio thread ready. Waiting for start trigger...")
+        logging.debug("Audio thread ready. Waiting for start trigger...")
         # Replace blocking wait with an interruptible loop.
         while not start_event.is_set():
             if stop_event.is_set():
                 return
             time.sleep(0.01)
-        logging.info("Start trigger received in audio thread.")
+        logging.debug("Start trigger received in audio thread.")
         if audio_offset > 0:
-            logging.info("Delaying audio playback for %s seconds.", audio_offset)
+            logging.debug("Delaying audio playback for %s seconds.", audio_offset)
             interruptible_sleep(audio_offset, stop_event)
         if stop_event.is_set():
             return
-        logging.info("Starting audio playback on device: %s", audio_device)
+        logging.debug("Starting audio playback on device: %s", audio_device)
         sd.play(data, samplerate=sample_rate, device=audio_device, latency="low")
 
         # Compute the duration of the audio in seconds.
         duration = len(data) / sample_rate
-        logging.info("Audio playback duration: %.3f seconds", duration)
+        logging.debug("Audio playback duration: %.3f seconds", duration)
         start_time = time.time()
         # Instead of sd.wait(), use an interruptible loop.
         while (time.time() - start_time) < duration:

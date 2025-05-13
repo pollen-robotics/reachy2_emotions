@@ -63,13 +63,11 @@ class EmotionPlayer:
             self.reachy = None
             exit(1)
         try:
-            logging.info("Turn on reachy")
             self.reachy.turn_on()
-            logging.info("Turn on antennas")
 
             self.reachy.head.r_antenna.turn_on()
             self.reachy.head.l_antenna.turn_on()
-            logging.info("Turn on done")
+            logging.info("Turn ON done")
         except Exception as e:
             logging.error(f"Error turning on Reachy: {e}")
             return
@@ -170,24 +168,23 @@ class EmotionPlayer:
         audio_file = os.path.splitext(path)[0] + ".wav"
         audio_available = os.path.exists(audio_file)
         if audio_available:
-            logging.info(f"Found corresponding audio file: {audio_file}")
+            logging.debug(f"Found corresponding audio file: {audio_file}")
         else:
-            logging.info("No audio file found; only motion replay will be executed.")
+            logging.debug("No audio file found; only motion replay will be executed.")
 
         # Check current positions to adapt the duration of the initial move.
         try:
-            # max_dist = distance_with_new_pose(self.reachy, data)
-            max_dist = joint_distance_with_new_pose(self.reachy, data)  # better way imo
-            logging.info(f"max_dist = {max_dist}")
+            # max_dist = distance_with_new_pose(self.reachy, data) 
+            max_joint_diff = joint_distance_with_new_pose(self.reachy, data)
+            first_duration = max_joint_diff / (self.max_joint_speed)
+            
 
         except Exception as e:
-            logging.error(f"Error computing distance: {e}")
+            logging.error(f"Error computing distance: {e}. Using default duration.")
             max_dist = 0
-        # first_duration = max_dist * 5 # TODO: do
-        # first_duration = 10 * max_dist / self.max_joint_speed
-        first_duration = 0.3
+            first_duration = 0.3
 
-        logging.info(f"Computed initial move duration: {first_duration:.2f} seconds")
+        logging.info(f"Max angle diff: {max_joint_diff:.1f}°, interpolation duration: {first_duration:.1f}s")
 
         start_event = threading.Event()
         self.audio_thread = None
@@ -200,20 +197,17 @@ class EmotionPlayer:
         if not self.auto_start:
             input("Is Reachy ready to move? Press Enter to continue.")
         else:
-            logging.info("Auto-start mode: proceeding without user confirmation.")
+            logging.debug("Auto-start mode: proceeding without user confirmation.")
         # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
         playback_offset = 1.6
         try:
             if first_duration > 0.0:
                 current_time = playback_offset
                 index = bisect.bisect_right(data["time"], current_time)
-                logging.info(f"l_arm goto: {data['l_arm'][index]}")
                 self.reachy.l_arm.goto(data["l_arm"][index], duration=first_duration, interpolation_mode="linear")
-                logging.info("r_arm goto")
                 self.reachy.r_arm.goto(data["r_arm"][index], duration=first_duration, interpolation_mode="linear")
                 # self.reachy.l_arm.gripper.set_opening(data["l_hand"][index]) # we need a goto for gripper so it's continuous
                 # self.reachy.r_arm.gripper.set_opening(data["r_hand"][index])
-                logging.info("head goto")
                 self.reachy.head.goto(
                     data["head"][index], duration=first_duration, interpolation_mode="linear"
                 )  # not using wait=true because it backfires if unreachable
@@ -235,7 +229,7 @@ class EmotionPlayer:
                     self.reachy.head.r_antenna.goal_position = lerp(r_antenna_pos, r_antenna_goal, alpha)
                     self.reachy.send_goal_positions(check_positions=False)
                     time.sleep(0.01)
-            logging.info("First position reached.")
+            logging.debug("First position reached.")
         except Exception as e:
             logging.error(f"Error moving to initial position: {e}")
             return
@@ -260,7 +254,7 @@ class EmotionPlayer:
 
                 # If we've reached or passed the last recorded time, use the final positions.
                 if current_time >= data["time"][-1]:
-                    logging.info("Reached end of recording; setting final positions.")
+                    logging.debug("Reached end of recording; setting final positions.")
                     # Set final positions for each component:
                     for joint, goal in zip(self.reachy.l_arm.joints.values(), data["l_arm"][-1]):
                         joint.goal_position = goal
@@ -370,27 +364,27 @@ class EmotionPlayer:
         except Exception as e:
             logging.error(f"Error during replay: {e}")
         finally:
-            logging.info(
+            logging.debug(
                 f"Finally of replay. if self.audio_thread and self.audio_thread.is_alive() = {self.audio_thread and self.audio_thread.is_alive()}"
             )
             if self.audio_thread and self.audio_thread.is_alive():
                 # sd.stop()
                 self.audio_thread.join()
-            logging.info("Endend Finally of replay") # Typo was in original, kept it as per "do only this change"
+            logging.debug("End Finally of replay") # Typo was in original, kept it as per "do only this change"
 
     def stop(self):
         if self.thread and self.thread.is_alive():
             logging.info("Stopping current emotion playback.")
             self.stop_event.set()
             time.sleep(0.1)
-            logging.info("Calling stop()")
+            logging.debug("Calling stop()")
 
-            logging.info("calling join()")
+            logging.debug("calling join()")
             self.thread.join()
             self.thread = None
-            logging.info("stop() finished.")
+            logging.debug("stop() finished.")
         else:
-            logging.info("No active playback to stop.")
+            logging.debug("No active playback to stop.")
 
 
 # ------------------------------------------------------------------------------
