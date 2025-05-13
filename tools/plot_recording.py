@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import json
 import argparse
+import json
 import logging
 import os
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -33,6 +33,7 @@ PART_PRETTY_NAMES = {
     "l_antenna": "Left Antenna",
     "r_antenna": "Right Antenna",
 }
+
 
 def load_recording_data(file_path: str) -> Dict[str, Any]:
     """Load the JSON recording."""
@@ -66,9 +67,8 @@ def load_recording_data(file_path: str) -> Dict[str, Any]:
         logging.error(f"Data validation error: {ve}")
         raise
 
-def parse_part_selection(
-    selection_str: str, available_parts: List[str]
-) -> Tuple[str, Optional[int]]:
+
+def parse_part_selection(selection_str: str, available_parts: List[str]) -> Tuple[str, Optional[int]]:
     """
     Parses a part selection string like 'l_arm' or 'l_arm:3'.
     Returns (part_name, joint_index) where joint_index is 0-based or None.
@@ -76,7 +76,7 @@ def parse_part_selection(
     if ":" in selection_str:
         try:
             part_name, joint_idx_str = selection_str.split(":")
-            joint_idx = int(joint_idx_str) - 1 # User provides 1-based index
+            joint_idx = int(joint_idx_str) - 1  # User provides 1-based index
             if joint_idx < 0:
                 raise ValueError("Joint index must be 1 or greater.")
         except ValueError:
@@ -85,7 +85,7 @@ def parse_part_selection(
                 "Format should be 'part_name:joint_number' (e.g., l_arm:3). "
                 "Plotting all joints for this part if valid."
             )
-            part_name = selection_str.split(":")[0] # Take part before colon
+            part_name = selection_str.split(":")[0]  # Take part before colon
             joint_idx = None
     else:
         part_name = selection_str
@@ -93,7 +93,7 @@ def parse_part_selection(
 
     if part_name not in available_parts:
         logging.warning(f"Part '{part_name}' from selection '{selection_str}' not available in data. Skipping.")
-        return None, None # Indicate invalid part
+        return None, None  # Indicate invalid part
 
     # Validate joint_idx against actual number of joints for the part
     if joint_idx is not None and part_name in PART_JOINT_COUNTS:
@@ -102,7 +102,7 @@ def parse_part_selection(
                 f"Joint index {joint_idx + 1} for part '{part_name}' is out of range "
                 f"(max {PART_JOINT_COUNTS[part_name]}). Plotting all joints for this part."
             )
-            joint_idx = None # Fallback to plotting all joints for this part
+            joint_idx = None  # Fallback to plotting all joints for this part
     return part_name, joint_idx
 
 
@@ -137,19 +137,22 @@ def prepare_plot_data(
                 joint_values = np.array([item[0] for item in part_data_raw if item])
             else:
                 joint_values = np.array(part_data_raw)
-            
+
             if specific_joint_idx_to_plot is None or specific_joint_idx_to_plot == 0:
                 current_part_trajectories.append(joint_values)
                 current_part_joint_indices.append(0)
             else:
-                logging.warning(f"Part '{part_name}' is single-valued; specific joint index {specific_joint_idx_to_plot + 1} ignored or invalid.")
+                logging.warning(
+                    f"Part '{part_name}' is single-valued; specific joint index {specific_joint_idx_to_plot + 1} ignored or invalid."
+                )
                 # Still plot if no specific index was asked (None) or if 0 was asked.
-                if specific_joint_idx_to_plot is None : # only add if no specific joint was requested (it means plot all for the part)
+                if (
+                    specific_joint_idx_to_plot is None
+                ):  # only add if no specific joint was requested (it means plot all for the part)
                     current_part_trajectories.append(joint_values)
                     current_part_joint_indices.append(0)
 
-
-        else: # Multiple joints
+        else:  # Multiple joints
             try:
                 for i, frame_joints in enumerate(part_data_raw):
                     if len(frame_joints) != num_total_joints_in_part:
@@ -158,15 +161,17 @@ def prepare_plot_data(
                             f"got {len(frame_joints)}."
                         )
                 all_joint_trajectories_for_part = np.array(part_data_raw).T
-                
+
                 if specific_joint_idx_to_plot is not None:
                     if 0 <= specific_joint_idx_to_plot < num_total_joints_in_part:
                         current_part_trajectories.append(all_joint_trajectories_for_part[specific_joint_idx_to_plot])
                         current_part_joint_indices.append(specific_joint_idx_to_plot)
                     else:
                         # This case should be caught by parse_part_selection, but good to be safe
-                        logging.warning(f"Invalid specific joint index {specific_joint_idx_to_plot} for part '{part_name}'. Skipping.")
-                else: # Plot all joints for this part
+                        logging.warning(
+                            f"Invalid specific joint index {specific_joint_idx_to_plot} for part '{part_name}'. Skipping."
+                        )
+                else:  # Plot all joints for this part
                     for idx in range(num_total_joints_in_part):
                         current_part_trajectories.append(all_joint_trajectories_for_part[idx])
                         current_part_joint_indices.append(idx)
@@ -177,7 +182,7 @@ def prepare_plot_data(
             except TypeError as e:
                 logging.error(f"Type error processing multi-joint part '{part_name}': {e}.")
                 continue
-        
+
         if current_part_trajectories:
             if part_name not in plot_data:
                 plot_data[part_name] = []
@@ -185,14 +190,13 @@ def prepare_plot_data(
             plot_data[part_name].extend(current_part_trajectories)
             joint_indices_to_plot[part_name].extend(current_part_joint_indices)
 
-
     return timestamps, plot_data, joint_indices_to_plot
 
 
 def plot_joint_data(
     timestamps: np.ndarray,
     prepared_data: Dict[str, List[np.ndarray]],
-    joint_indices_plotted: Dict[str, List[int]], # 0-based indices of joints plotted for each part
+    joint_indices_plotted: Dict[str, List[int]],  # 0-based indices of joints plotted for each part
     main_title: str,
     show_points: bool = False,
 ):
@@ -206,28 +210,23 @@ def plot_joint_data(
     # 'tab10' has 10 distinct colors, 'tab20' has 20.
     # We'll cycle through 'tab10' for better distinction if fewer than 10 lines per plot.
     # If more, we might need a different strategy or accept some color reuse.
-    
-    fig, axes = plt.subplots(
-        num_parts_with_data, 1, 
-        figsize=(14, 3.5 * num_parts_with_data), 
-        sharex=True, 
-        squeeze=False
-    )
-    axes = axes.flatten() 
 
-    plot_idx = 0 # Index for iterating through axes
+    fig, axes = plt.subplots(num_parts_with_data, 1, figsize=(14, 3.5 * num_parts_with_data), sharex=True, squeeze=False)
+    axes = axes.flatten()
+
+    plot_idx = 0  # Index for iterating through axes
     for part_name, joint_trajectories_list in prepared_data.items():
-        if not joint_trajectories_list: # Should not happen if prepare_plot_data is correct
+        if not joint_trajectories_list:  # Should not happen if prepare_plot_data is correct
             continue
 
         ax = axes[plot_idx]
         part_pretty_name = PART_PRETTY_NAMES.get(part_name, part_name.replace("_", " ").title())
         ax.set_title(part_pretty_name, fontsize=12)
-        ax.set_ylabel("Joint Position", fontsize=10) # Removed (degrees/units) for now
+        ax.set_ylabel("Joint Position", fontsize=10)  # Removed (degrees/units) for now
         ax.grid(True, linestyle="--", alpha=0.6)
 
         # Use 'tab10' for distinct colors, cycle if more than 10 joints in one subplot
-        prop_cycle = plt.cycler(color=plt.cm.get_cmap('tab10').colors)
+        prop_cycle = plt.cycler(color=plt.cm.get_cmap("tab10").colors)
         ax.set_prop_cycle(prop_cycle)
 
         actual_joint_indices_for_this_part = joint_indices_plotted.get(part_name, [])
@@ -240,29 +239,33 @@ def plot_joint_data(
                     f"Joint data dimension ({joint_trajectory.shape[0]})"
                 )
                 continue
-            
+
             # Determine the true joint number (1-based for label)
             # This relies on joint_indices_plotted being correctly populated by prepare_plot_data
-            true_joint_num_1_based = (actual_joint_indices_for_this_part[i] + 1) if i < len(actual_joint_indices_for_this_part) else (i + 1)
+            true_joint_num_1_based = (
+                (actual_joint_indices_for_this_part[i] + 1) if i < len(actual_joint_indices_for_this_part) else (i + 1)
+            )
 
             label = f"Joint {true_joint_num_1_based}" if PART_JOINT_COUNTS[part_name] > 1 else part_pretty_name
-            
-            line, = ax.plot(timestamps, joint_trajectory, label=label, linewidth=1.5, alpha=0.8)
+
+            (line,) = ax.plot(timestamps, joint_trajectory, label=label, linewidth=1.5, alpha=0.8)
             if show_points:
-                ax.plot(timestamps, joint_trajectory, marker='o', linestyle='None', markersize=3, color=line.get_color(), alpha=0.6)
-        
-        if any(PART_JOINT_COUNTS[p] > 1 for p in prepared_data.keys() if p == part_name) or len(joint_trajectories_list) > 1 :
-             ax.legend(loc="best", fontsize="small") # 'best' can sometimes be slow or overlap
-        
-        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=12, prune='both'))
-        ax.tick_params(axis='x', rotation=25, labelsize=9)
-        ax.tick_params(axis='y', labelsize=9)
+                ax.plot(
+                    timestamps, joint_trajectory, marker="o", linestyle="None", markersize=3, color=line.get_color(), alpha=0.6
+                )
+
+        if any(PART_JOINT_COUNTS[p] > 1 for p in prepared_data.keys() if p == part_name) or len(joint_trajectories_list) > 1:
+            ax.legend(loc="best", fontsize="small")  # 'best' can sometimes be slow or overlap
+
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=12, prune="both"))
+        ax.tick_params(axis="x", rotation=25, labelsize=9)
+        ax.tick_params(axis="y", labelsize=9)
         plot_idx += 1
 
     if num_parts_with_data > 0:
         axes[-1].set_xlabel("Time (seconds)", fontsize=10)
-        fig.suptitle(main_title, fontsize=16, y=0.99) 
-        plt.tight_layout(rect=[0, 0.02, 1, 0.96]) # Adjust rect for suptitle and xlabel
+        fig.suptitle(main_title, fontsize=16, y=0.99)
+        plt.tight_layout(rect=[0, 0.02, 1, 0.96])  # Adjust rect for suptitle and xlabel
 
     plt.show()
 
@@ -297,11 +300,11 @@ def main():
 
     if "all" in args.parts:
         for part_name in available_parts_in_data:
-            parts_config_to_plot.append((part_name, None)) # None means all joints for this part
+            parts_config_to_plot.append((part_name, None))  # None means all joints for this part
     else:
         for selection_str in args.parts:
             part_name, joint_idx = parse_part_selection(selection_str, available_parts_in_data)
-            if part_name: # If valid part was parsed
+            if part_name:  # If valid part was parsed
                 # Avoid duplicates if user specifies 'l_arm' and 'l_arm:3'
                 # Current logic will plot l_arm (all joints) then l_arm (joint 3)
                 # For simplicity, we'll allow this for now. User should be specific.
@@ -310,7 +313,6 @@ def main():
                 # If 'l_arm:3' is also present, the current `prepare_plot_data` might plot joint 3 twice
                 # if it's not careful with how it accumulates. Let's refine prepare_plot_data.
                 parts_config_to_plot.append((part_name, joint_idx))
-
 
     if not parts_config_to_plot:
         logging.error("No valid parts selected or found in the data for plotting.")
@@ -322,23 +324,23 @@ def main():
     if not prepared_plot_data:
         logging.error("Failed to prepare any data for plotting.")
         return
-        
+
     plot_joint_data(timestamps, prepared_plot_data, joint_indices_plotted, plot_main_title, True)
 
 
 if __name__ == "__main__":
     try:
-        if 'seaborn-v0_8-darkgrid' in plt.style.available:
-            plt.style.use('seaborn-v0_8-darkgrid')
-        elif 'seaborn-darkgrid' in plt.style.available:
-            plt.style.use('seaborn-darkgrid')
-        elif 'ggplot' in plt.style.available:
-            plt.style.use('ggplot')
+        if "seaborn-v0_8-darkgrid" in plt.style.available:
+            plt.style.use("seaborn-v0_8-darkgrid")
+        elif "seaborn-darkgrid" in plt.style.available:
+            plt.style.use("seaborn-darkgrid")
+        elif "ggplot" in plt.style.available:
+            plt.style.use("ggplot")
         else:
             logging.info("Common preferred styles not found, using Matplotlib default.")
     except Exception as e:
         logging.warning(f"Could not set a preferred Matplotlib style, using default. Error: {e}")
-    
+
     # plt.rcParams['lines.markersize'] = 4 # Example for global marker size if needed
     # plt.rcParams['lines.linewidth'] = 1.8 # Example for global line width
     main()
