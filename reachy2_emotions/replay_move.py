@@ -2,166 +2,34 @@
 import argparse
 import bisect
 import difflib
-import json
 import logging
 import os
-import pathlib
 import threading
 import time
 import traceback
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 import sounddevice as sd
-import soundfile as sf
 
 # For the Flask server mode:
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from reachy2_sdk import ReachySDK  # type: ignore
+from reachy2_emotions.utils import (
+    RECORD_FOLDER,
+    list_available_emotions,
+    load_data,
+    play_audio,
+    joint_distance_with_new_pose,
+    lerp,
+    interruptible_sleep,
+    get_last_recording,
+    print_available_emotions,
+)
 
-# ------------------------------------------------------------------------------
-# Logging configuration
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
-# Folder with recordings (JSON + corresponding WAV files)
-RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
-
-"""
-TODOs
-- Maybe movements should start a bit after 1.6s. Because at that time most of them are static. So coming from a goto makes a weird stop.
-- IDLE -> weird looking small pause with 0 movements -> movement     
-"""
-
-# ------------------------------------------------------------------------------
-# Helper functions
-
-
-def lerp(v0, v1, alpha):
-    """Linear interpolation between two values."""
-    return v0 + alpha * (v1 - v0)
-
-
-def interruptible_sleep(duration: float, stop_event: threading.Event):
-    """Sleep in small increments while checking if stop_event is set."""
-    end_time = time.time() + duration
-    while time.time() < end_time:
-        if stop_event.is_set():
-            break
-        time.sleep(0.01)
-
-
-def list_available_emotions(folder: str) -> list:
-    """
-    List all available emotions based on the JSON files in the folder.
-    The emotion name is the filename without the .json extension.
-    """
-    emotions = []
-    if not os.path.exists(folder):
-        logging.error("Record folder %s does not exist.", folder)
-        return emotions
-    for file in os.listdir(folder):
-        if file.endswith(".json"):
-            emotion = os.path.splitext(file)[0]
-            emotions.append(emotion)
-    return sorted(emotions)
-
-
-def get_last_recording(folder: str) -> str:
-    """Retrieve the most recent JSON recording file from a folder."""
-    files = [f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f)) and f.endswith(".json")]
-    if not files:
-        raise FileNotFoundError("No JSON recordings found in folder.")
-    files.sort(key=lambda f: os.path.getctime(os.path.join(folder, f)))
-    return files[-1]
-
-
-def load_data(path: str) -> Tuple[dict, float]:
-    """Load the JSON recording and compute the timeframe between frames."""
-    with open(path, "r") as f:
-        data = json.load(f)
-    logging.info("Data loaded from %s", path)
-    if len(data["time"]) < 2:
-        raise ValueError("Insufficient time data in the recording.")
-    timeframe = (data["time"][-1] - data["time"][0]) / len(data["time"])
-    return data, timeframe
-
-
-def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
-    """
-    Compute the maximum Euclidean distance between the current arm poses
-    and the first recorded poses.
-    """
-    first_l_arm_pose = reachy.l_arm.forward_kinematics(data["l_arm"][0])
-    first_r_arm_pose = reachy.r_arm.forward_kinematics(data["r_arm"][0])
-    current_l_arm_pose = reachy.l_arm.forward_kinematics()
-    current_r_arm_pose = reachy.r_arm.forward_kinematics()
-
-    distance_l_arm = np.linalg.norm(first_l_arm_pose[:3, 3] - current_l_arm_pose[:3, 3])
-    distance_r_arm = np.linalg.norm(first_r_arm_pose[:3, 3] - current_r_arm_pose[:3, 3])
-
-    return np.max([distance_l_arm, distance_r_arm])
-
-
-def joint_distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
-    """Similar to distance_with_new_pose but returns the max angle distance that any joint must travel to reach the new pose."""
-    max_dist = 0
-    for group, joints in [("l_arm", reachy.l_arm.joints), ("r_arm", reachy.r_arm.joints), ("head", reachy.head.joints)]:
-        idx = -1
-        for name, joint in joints.items():
-            idx += 1
-            dist = np.abs(joint.present_position - data[group][0][idx])
-            if dist > max_dist:
-                max_dist = dist
-    return max_dist
-
-
-def play_audio(
-    audio_file: str, audio_device: Optional[str], start_event: threading.Event, audio_offset: float, stop_event: threading.Event
-):
-    """
-    Load the recorded audio file and wait for a common start trigger.
-    If audio_offset is positive, delay playback; if negative, start immediately.
-    """
-    try:
-        data, sample_rate = sf.read(audio_file, dtype="float32")
-        if sample_rate != 44100:
-            logging.warning("Recorded sample rate (%s) differs from default (44100).", sample_rate)
-        logging.info("Audio thread ready. Waiting for start trigger...")
-        # Replace blocking wait with an interruptible loop.
-        while not start_event.is_set():
-            if stop_event.is_set():
-                return
-            time.sleep(0.01)
-        logging.info("Start trigger received in audio thread.")
-        if audio_offset > 0:
-            logging.info("Delaying audio playback for %s seconds.", audio_offset)
-            interruptible_sleep(audio_offset, stop_event)
-        if stop_event.is_set():
-            return
-        logging.info("Starting audio playback on device: %s", audio_device)
-        sd.play(data, samplerate=sample_rate, device=audio_device, latency="low")
-
-        # Compute the duration of the audio in seconds.
-        duration = len(data) / sample_rate
-        logging.info("Audio playback duration: %.3f seconds", duration)
-        start_time = time.time()
-        # Instead of sd.wait(), use an interruptible loop.
-        while (time.time() - start_time) < duration:
-            if stop_event.is_set():
-                logging.info("Audio playback interrupted during wait loop.")
-                sd.stop()
-                return
-            time.sleep(0.01)
-        sd.stop()
-        logging.info("Audio playback finished.")
-    except Exception as e:
-        logging.error("Error during audio playback: %s", e)
-        logging.info("Available audio devices: %s", sd.query_devices())
-
-
-# ------------------------------------------------------------------------------
-# EmotionPlayer class
 
 
 class EmotionPlayer:
@@ -188,7 +56,6 @@ class EmotionPlayer:
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
-        # Create the Reachy instance once here.
         try:
             self.reachy = ReachySDK(host=self.ip)
 
@@ -227,6 +94,7 @@ class EmotionPlayer:
             self.stop_event.clear()
             self.thread = threading.Thread(target=self._replay_thread, args=(filename,))
             # Seems to work but it's shaky. The dt of the recordings is quite high (~30Hz), maybe setting a fix dt for speed calculations is bad?
+            # => Note: I'll code this using polynomial interpolation+derivatives to get the speed.
             # self.thread = threading.Thread(target=self._replay_thread_smart_interpol, args=(filename,))
 
             self.thread.start()
@@ -322,9 +190,8 @@ class EmotionPlayer:
         # first_duration = max_dist * 5 # TODO: do
         # first_duration = 10 * max_dist / self.max_joint_speed
         first_duration = 0.3
-        
-        logging.info("Computed initial move duration: %.2f seconds", first_duration)
 
+        logging.info("Computed initial move duration: %.2f seconds", first_duration)
 
         start_event = threading.Event()
         self.audio_thread = None
@@ -784,36 +651,7 @@ class EmotionPlayer:
 
 
 # ------------------------------------------------------------------------------
-# Play All Available Emotions
-
-
-def run_all_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: float):
-    """
-    Mode that plays all available emotions sequentially.
-    It prints a big header for each emotion so it stands out among the logs.
-    Each emotion is fully played (i.e. its playback thread is joined)
-    before moving on to the next one.
-    """
-    player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True, verbose=False)
-    emotions = list_available_emotions(RECORD_FOLDER)
-    if not emotions:
-        logging.error("No available emotions found in %s", RECORD_FOLDER)
-        return
-
-    for emotion in emotions:
-        print("\n" + "=" * 40)
-        print("==== PLAYING EMOTION: {} ====".format(emotion.upper()))
-        print("=" * 40 + "\n")
-        player.play_emotion(emotion)
-        if player.thread:
-            player.thread.join()  # Ensure this emotion is finished before the next
-        # Optional short pause between emotions
-        time.sleep(0.5)
-
-
-# ------------------------------------------------------------------------------
 # Modes
-
 
 def run_cli_mode(ip: str, filename: Optional[str], audio_device: Optional[str], audio_offset: float):
     """
@@ -840,83 +678,6 @@ def run_server_mode(ip: str, audio_device: Optional[str], audio_offset: float, f
     New requests interrupt current playback.
     """
     player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
-    # allowed_emotions = list_available_emotions(RECORD_FOLDER) # enables all possible emotions
-    # Allowing only a subset of emotions
-    allowed_emotions = [
-        "dodo1",
-        "ecoute2",
-        "fatigue1",
-        "ecoute1",
-        "macarena1",
-        "curieux1",
-        "solitaire1",
-        "ennui2",
-        "fatigue2",
-        "furieux2",
-        "ennui1",
-        "apaisant1",
-        "timide1",
-        "anxiete1",
-        "perdu1",
-        "triste1",
-        "abattu1",
-        "furieux1",
-        "attentif1",
-        "enthousiaste2",
-        "enthousiaste3",
-        "attentif2",
-        "confus1",
-        "penseur1",
-        "oui_triste1",
-        "fier1",
-        "frustre1",
-        "incertain1",
-        "enthousiaste1",
-        "serenite1",
-        "aimant1",
-        "serenite2",
-        "impatient1",
-        "serviable2",
-        "degoute1",
-        "accueillant1",
-        "enjoue1",
-        "mecontent1",
-        "peur2",
-        "mecontent2",
-        "interrogatif2",
-        "non_triste1",
-        "incomprehensif1",
-        "reconnaissant1",
-        "rieur1",
-        "soulagement1",
-        "comprehension1",
-        "enerve2",
-        "impatient2",
-        "non",
-        "serviable1",
-        "patient1",
-        "oui1",
-        "enerve1",
-        "frustre2",
-        "mepris1",
-        "amical1",
-        "non_excite1",
-        "etonne1",
-        "fier2",
-        "emerveille1",
-        "oui_excite1",
-        "resigne1",
-        "interrogatif1",
-        "oups1",
-        "peur1",
-        "surpris1",
-        "rieur2",
-        "comprehension2",
-        "celebrant1",
-    ]
-
-    logging.info("Available emotions: %s", allowed_emotions)
-
     app = Flask(__name__)
     CORS(app)
 
@@ -946,15 +707,28 @@ def run_server_mode(ip: str, audio_device: Optional[str], audio_offset: float, f
     app.run(port=flask_port, host="0.0.0.0")
 
 
-# Print all available emotions
-def print_available_emotions() -> None:
+def run_all_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: float):
     """
-    Print all available emotions in the record folder.
+    Mode that plays all available emotions sequentially.
+    It prints a big header for each emotion so it stands out among the logs.
+    Each emotion is fully played (i.e. its playback thread is joined)
+    before moving on to the next one.
     """
-
+    player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True, verbose=False)
     emotions = list_available_emotions(RECORD_FOLDER)
-    print("Available emotions:")
-    print(emotions)
+    if not emotions:
+        logging.error("No available emotions found in %s", RECORD_FOLDER)
+        return
+
+    for emotion in emotions:
+        print("\n" + "=" * 40)
+        print("==== PLAYING EMOTION: {} ====".format(emotion.upper()))
+        print("=" * 40 + "\n")
+        player.play_emotion(emotion)
+        if player.thread:
+            player.thread.join()  # Ensure this emotion is finished before the next
+        # Optional short pause between emotions
+        time.sleep(0.5)
 
 
 # ------------------------------------------------------------------------------
