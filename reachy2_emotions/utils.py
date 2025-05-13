@@ -5,7 +5,7 @@ import os
 import pathlib
 import threading
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 
 import numpy as np
 import sounddevice as sd
@@ -17,6 +17,16 @@ from reachy2_sdk import ReachySDK  # type: ignore
 # Folder with recordings (JSON + corresponding WAV files)
 # RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
 RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "post_processed_recordings"
+
+PART_JOINT_COUNTS = { 
+    "l_arm": 7,
+    "r_arm": 7,
+    "head": 3,
+    "l_hand": 1,
+    "r_hand": 1,
+    "l_antenna": 1,
+    "r_antenna": 1,
+}
 
 
 # Print all available emotions
@@ -78,6 +88,58 @@ def load_data(path: str) -> Tuple[dict, float]:
         raise ValueError("Insufficient time data in the recording.")
     timeframe = (data["time"][-1] - data["time"][0]) / len(data["time"])
     return data, timeframe
+
+def load_processed_data(path: str) -> Tuple[Optional[Dict[str, Any]], Optional[float], Optional[int]]:
+    """
+    Load the PROCESSED JSON recording.
+    Returns:
+        - data (dict): The loaded data, including '{part}_speed' keys.
+                       Positions are under original part keys, time under 'time'.
+        - timeframe (float): 1.0 / target_hz from metadata.
+        - target_hz (int): The target_hz from metadata.
+    Returns (None, None, None) on error.
+    """
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+        logging.debug(f"Processed data loaded from {path}")
+
+        if "time" not in data or not isinstance(data["time"], list) or len(data["time"]) < 2:
+            logging.error("Processed data missing 'time' key or insufficient time entries.")
+            return None, None, None
+        
+        metadata = data.get("processing_metadata", {})
+        target_hz = metadata.get("target_hz")
+        if target_hz is None:
+            # Fallback: try to estimate from time array if metadata is missing
+            if len(data["time"]) >= 2:
+                time_diffs = np.diff(data["time"])
+                if len(time_diffs) > 0 and np.all(np.isclose(time_diffs, time_diffs[0])): # Check if regularly spaced
+                    dt_estimated = time_diffs[0]
+                    if dt_estimated > 1e-9: # Avoid division by zero
+                        target_hz = int(round(1.0 / dt_estimated))
+                        logging.warning(f"target_hz not in metadata, estimated {target_hz}Hz from time array.")
+                    else:
+                        logging.error("Estimated dt from time array is too small or zero.")
+                        return None, None, None
+                else:
+                    logging.error("target_hz not in metadata and time array is not regularly spaced for estimation.")
+                    return None, None, None
+            else:
+                logging.error("target_hz not in metadata and not enough time points to estimate.")
+                return None, None, None
+
+        timeframe = 1.0 / target_hz
+        return data, timeframe, target_hz
+    except FileNotFoundError:
+        logging.error(f"Processed data file not found: {path}")
+        return None, None, None
+    except json.JSONDecodeError:
+        logging.error(f"Error decoding JSON from processed file: {path}")
+        return None, None, None
+    except Exception as e:
+        logging.error(f"Generic error loading processed data from {path}: {e}")
+        return None, None, None
 
 
 def distance_with_new_pose(reachy: ReachySDK, data: dict) -> float:
