@@ -281,11 +281,6 @@ def main():
             "Use 'all' to plot all joints of all available parts. Default: all."
         ),
     )
-    parser.add_argument(
-        "--show-points",
-        action="store_true",
-        help="Show markers for individual data points on the lines.",
-    )
 
     args = parser.parse_args()
 
@@ -328,7 +323,7 @@ def main():
         logging.error("Failed to prepare any data for plotting.")
         return
         
-    plot_joint_data(timestamps, prepared_plot_data, joint_indices_plotted, plot_main_title, args.show_points)
+    plot_joint_data(timestamps, prepared_plot_data, joint_indices_plotted, plot_main_title, True)
 
 
 if __name__ == "__main__":
