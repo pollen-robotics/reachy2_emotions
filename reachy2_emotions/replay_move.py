@@ -170,7 +170,7 @@ class EmotionPlayer:
         if audio_available:
             logging.debug(f"Found corresponding audio file: {audio_file}")
         else:
-            logging.debug("No audio file found; only motion replay will be executed.")
+            logging.error("No audio file found; only motion replay will be executed.")
 
         # Check current positions to adapt the duration of the initial move.
         try:
