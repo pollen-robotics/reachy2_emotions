@@ -82,14 +82,14 @@ Arguments of emotion-play:
 
 Records Reachy’s joint motions and microphone audio into .json and .wav files.
 ```bash
-emotion-record --filename devastated2
+emotion-record --name devastated2
 ```
 
 Arguments emotion-record:
 
     --ip: IP of Reachy (default: localhost)
 
-    --filename: base name for output files
+    --name: base name for output files
 
     --freq: recording frequency (default: 100Hz)
 
