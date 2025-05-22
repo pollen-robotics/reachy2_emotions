@@ -9,25 +9,21 @@ import time
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-from reachy2_sdk import ReachySDK  # type: ignore
+# from reachy2_sdk import ReachySDK  # type: ignore
+from stewart_little_control import Client
+
 
 from reachy2_emotions.utils import RECORD_FOLDER
 
 
 def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: str) -> None:
     # connect to Reachy
-    reachy = ReachySDK(host=ip)
-
+    # reachy = ReachySDK(host=ip)
+    reachy_mini = Client()
     # Data container for robot motion
     data: dict = {
         "time": [],
-        "l_arm": [],
-        "l_hand": [],
-        "r_arm": [],
-        "r_hand": [],
-        "head": [],
-        "l_antenna": [],
-        "r_antenna": [],
+        "reachy_mini": [],
     }
 
     # --- Setup Audio Recording ---
@@ -68,23 +64,11 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 
         while True:
             # Get current positions from Reachy
-            l_arm = reachy.l_arm.get_current_positions()
-            r_arm = reachy.r_arm.get_current_positions()
-            head = reachy.head.get_current_positions()
-            l_hand = reachy.l_arm.gripper.get_current_opening()
-            r_hand = reachy.r_arm.gripper.get_current_opening()
-            l_antenna = reachy.head.l_antenna.present_position
-            r_antenna = reachy.head.r_antenna.present_position
+            reachy_mini_joints = reachy_mini.get_joint_positions()
 
             # Save timestamp and joint data
             data["time"].append(time.time() - t0)
-            data["l_arm"].append(l_arm)
-            data["l_hand"].append(l_hand)
-            data["r_arm"].append(r_arm)
-            data["r_hand"].append(r_hand)
-            data["head"].append(head)
-            data["l_antenna"].append(l_antenna)
-            data["r_antenna"].append(r_antenna)
+            data["reachy_mini"].append(reachy_mini_joints)
 
             time.sleep(1 / freq)  # TODO should be adjusted to match the desired frequency
     except KeyboardInterrupt:

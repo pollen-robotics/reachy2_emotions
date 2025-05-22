@@ -15,7 +15,9 @@ import sounddevice as sd
 # For the Flask server mode:
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from reachy2_sdk import ReachySDK  # type: ignore
+# from reachy2_sdk import ReachySDK  # type: ignore
+from stewart_little_control import Client
+
 
 from reachy2_emotions.utils import (
     RECORD_FOLDER,
@@ -56,21 +58,22 @@ class EmotionPlayer:
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
         try:
-            self.reachy = ReachySDK(host=self.ip)
+            # self.reachy = ReachySDK(host=self.ip)
+            self.reachy_mini = Client()
 
         except Exception as e:
             logging.error(f"Error connecting to Reachy in constructor: {e}")
-            self.reachy = None
+            self.reachy_mini = None
             exit(1)
-        try:
-            self.reachy.turn_on()
+        # try:
+        #     self.reachy.turn_on()
 
-            self.reachy.head.r_antenna.turn_on()
-            self.reachy.head.l_antenna.turn_on()
-            logging.info("Turn ON done")
-        except Exception as e:
-            logging.error(f"Error turning on Reachy: {e}")
-            return
+        #     self.reachy.head.r_antenna.turn_on()
+        #     self.reachy.head.l_antenna.turn_on()
+        #     logging.info("Turn ON done")
+        # except Exception as e:
+        #     logging.error(f"Error turning on Reachy: {e}")
+        #     return
         # NEW: add a send lock and idle thread controls.
         self.send_lock = threading.Lock()
         self.idle_thread = None
@@ -93,7 +96,7 @@ class EmotionPlayer:
 
             self.thread.start()
 
-    def _idle_loop(self, idle_final_positions, idle_params, gripper_params, antenna_params, dt):
+    def _idle_loop(self):
         logging.info("Starting idle animation loop.")
         # Define idle animation parameters.
         idle_amplitude = 0.5  # maximum offset magnitude
@@ -101,41 +104,43 @@ class EmotionPlayer:
         idle_amplitude_gripper = 10.0
         idle_start_time = time.time()
         while not self.idle_stop_event.is_set():
-            t_idle = time.time() - idle_start_time
-            # Update arm and head joints with smooth sinusoidal idle offsets.
-            for group, joints in [
-                ("l_arm", self.reachy.l_arm.joints),
-                ("r_arm", self.reachy.r_arm.joints),
-                ("head", self.reachy.head.joints),
-            ]:
-                for name, joint in joints.items():
-                    freq, phase = idle_params[group][name]
-                    offset = idle_amplitude * np.sin(2 * np.pi * freq * t_idle + phase)
-                    joint.goal_position = idle_final_positions[group][name] + offset
-            # Update grippers.
-            for gripper, params in gripper_params.items():
-                freq, phase = params
-                offset = idle_amplitude_gripper * np.sin(2 * np.pi * freq * t_idle + phase)
-                if gripper == "l_hand":
-                    self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + offset
-                else:
-                    self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + offset
-            # Update antennas.
-            for antenna, params in antenna_params.items():
-                freq, phase = params
-                offset = idle_amplitude_antenna * np.sin(2 * np.pi * freq * t_idle + phase)
-                if antenna == "l_antenna":
-                    self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + offset
-                else:
-                    self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + offset
-            with self.send_lock:
-                self.reachy.send_goal_positions(check_positions=False)
-            time.sleep(dt)
+            # t_idle = time.time() - idle_start_time
+            print("Idle loop")
+            self.reachy_mini.send_joints([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            # # Update arm and head joints with smooth sinusoidal idle offsets.
+            # for group, joints in [
+            #     ("l_arm", self.reachy.l_arm.joints),
+            #     ("r_arm", self.reachy.r_arm.joints),
+            #     ("head", self.reachy.head.joints),
+            # ]:
+            #     for name, joint in joints.items():
+            #         freq, phase = idle_params[group][name]
+            #         offset = idle_amplitude * np.sin(2 * np.pi * freq * t_idle + phase)
+            #         joint.goal_position = idle_final_positions[group][name] + offset
+            # # Update grippers.
+            # for gripper, params in gripper_params.items():
+            #     freq, phase = params
+            #     offset = idle_amplitude_gripper * np.sin(2 * np.pi * freq * t_idle + phase)
+            #     if gripper == "l_hand":
+            #         self.reachy.l_arm.gripper.goal_position = idle_final_positions["l_hand"] + offset
+            #     else:
+            #         self.reachy.r_arm.gripper.goal_position = idle_final_positions["r_hand"] + offset
+            # # Update antennas.
+            # for antenna, params in antenna_params.items():
+            #     freq, phase = paramse
+            #     offset = idle_amplitude_antenna * np.sin(2 * np.pi * freq * t_idle + phase)
+            #     if antenna == "l_antenna":
+            #         self.reachy.head.l_antenna.goal_position = idle_final_positions["l_antenna"] + offset
+            #     else:
+            #         self.reachy.head.r_antenna.goal_position = idle_final_positions["r_antenna"] + offset
+            # with self.send_lock:
+            #     self.reachy.send_goal_positions(check_positions=False)
+            time.sleep(0.01)
         logging.info("Idle animation loop stopped.")
 
     def _replay_thread(self, filename: str):
         logging.info(f"Starting emotion playback for {filename}")
-        if self.reachy is None:
+        if self.reachy_mini is None:
             logging.error("No valid Reachy instance available.")
             return
 
@@ -173,17 +178,17 @@ class EmotionPlayer:
             logging.debug("No audio file found; only motion replay will be executed.")
 
         # Check current positions to adapt the duration of the initial move.
-        try:
-            # max_dist = distance_with_new_pose(self.reachy, data)
-            max_joint_diff = joint_distance_with_new_pose(self.reachy, data)
-            first_duration = max_joint_diff / (self.max_joint_speed)
+        # try:
+        #     # max_dist = distance_with_new_pose(self.reachy, data)
+        #     max_joint_diff = joint_distance_with_new_pose(self.reachy, data)
+        #     first_duration = max_joint_diff / (self.max_joint_speed)
 
-        except Exception as e:
-            logging.error(f"Error computing distance: {e}. Using default duration.")
-            max_dist = 0
-            first_duration = 0.3
+        # except Exception as e:
+        #     logging.error(f"Error computing distance: {e}. Using default duration.")
+        max_dist = 0
+        first_duration = 0.3
 
-        logging.info(f"Max angle diff: {max_joint_diff:.1f}°, interpolation duration: {first_duration:.1f}s")
+        # logging.info(f"Max angle diff: {max_joint_diff:.1f}°, interpolation duration: {first_duration:.1f}s")
 
         start_event = threading.Event()
         self.audio_thread = None
@@ -199,39 +204,39 @@ class EmotionPlayer:
             logging.debug("Auto-start mode: proceeding without user confirmation.")
         # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
         playback_offset = 1.6
-        try:
-            if first_duration > 0.0:
-                current_time = playback_offset
-                index = bisect.bisect_right(data["time"], current_time)
-                self.reachy.l_arm.goto(data["l_arm"][index], duration=first_duration, interpolation_mode="linear")
-                self.reachy.r_arm.goto(data["r_arm"][index], duration=first_duration, interpolation_mode="linear")
-                # self.reachy.l_arm.gripper.set_opening(data["l_hand"][index]) # we need a goto for gripper so it's continuous
-                # self.reachy.r_arm.gripper.set_opening(data["r_hand"][index])
-                self.reachy.head.goto(
-                    data["head"][index], duration=first_duration, interpolation_mode="linear"
-                )  # not using wait=true because it backfires if unreachable
-                # Instead, we interpolate the antennas and grippers by hand during first_duration. This also provides the delay needed for the arms+head gotos.
-                l_gripper_goal = data["l_hand"][index]
-                r_gripper_goal = data["r_hand"][index]
-                l_antenna_goal = data["l_antenna"][index]
-                r_antenna_goal = data["r_antenna"][index]
-                l_gripper_pos = self.reachy.l_arm.gripper.present_position
-                r_gripper_pos = self.reachy.r_arm.gripper.present_position
-                l_antenna_pos = self.reachy.head.l_antenna.present_position
-                r_antenna_pos = self.reachy.head.r_antenna.present_position
-                t0 = time.time()
-                while time.time() - t0 < first_duration:
-                    alpha = (time.time() - t0) / first_duration
-                    self.reachy.l_arm.gripper.goal_position = lerp(l_gripper_pos, l_gripper_goal, alpha)
-                    self.reachy.r_arm.gripper.goal_position = lerp(r_gripper_pos, r_gripper_goal, alpha)
-                    self.reachy.head.l_antenna.goal_position = lerp(l_antenna_pos, l_antenna_goal, alpha)
-                    self.reachy.head.r_antenna.goal_position = lerp(r_antenna_pos, r_antenna_goal, alpha)
-                    self.reachy.send_goal_positions(check_positions=False)
-                    time.sleep(0.01)
-            logging.debug("First position reached.")
-        except Exception as e:
-            logging.error(f"Error moving to initial position: {e}")
-            return
+        # try:
+        #     if first_duration > 0.0:
+        #         current_time = playback_offset
+        #         index = bisect.bisect_right(data["time"], current_time)
+        #         self.reachy.l_arm.goto(data["l_arm"][index], duration=first_duration, interpolation_mode="linear")
+        #         self.reachy.r_arm.goto(data["r_arm"][index], duration=first_duration, interpolation_mode="linear")
+        #         # self.reachy.l_arm.gripper.set_opening(data["l_hand"][index]) # we need a goto for gripper so it's continuous
+        #         # self.reachy.r_arm.gripper.set_opening(data["r_hand"][index])
+        #         self.reachy.head.goto(
+        #             data["head"][index], duration=first_duration, interpolation_mode="linear"
+        #         )  # not using wait=true because it backfires if unreachable
+        #         # Instead, we interpolate the antennas and grippers by hand during first_duration. This also provides the delay needed for the arms+head gotos.
+        #         l_gripper_goal = data["l_hand"][index]
+        #         r_gripper_goal = data["r_hand"][index]
+        #         l_antenna_goal = data["l_antenna"][index]
+        #         r_antenna_goal = data["r_antenna"][index]
+        #         l_gripper_pos = self.reachy.l_arm.gripper.present_position
+        #         r_gripper_pos = self.reachy.r_arm.gripper.present_position
+        #         l_antenna_pos = self.reachy.head.l_antenna.present_position
+        #         r_antenna_pos = self.reachy.head.r_antenna.present_position
+        #         t0 = time.time()
+        #         while time.time() - t0 < first_duration:
+        #             alpha = (time.time() - t0) / first_duration
+        #             self.reachy.l_arm.gripper.goal_position = lerp(l_gripper_pos, l_gripper_goal, alpha)
+        #             self.reachy.r_arm.gripper.goal_position = lerp(r_gripper_pos, r_gripper_goal, alpha)
+        #             self.reachy.head.l_antenna.goal_position = lerp(l_antenna_pos, l_antenna_goal, alpha)
+        #             self.reachy.head.r_antenna.goal_position = lerp(r_antenna_pos, r_antenna_goal, alpha)
+        #             self.reachy.send_goal_positions(check_positions=False)
+        #             time.sleep(0.01)
+        #     logging.debug("First position reached.")
+        # except Exception as e:
+        #     logging.error(f"Error moving to initial position: {e}")
+        #     return
 
         start_event.set()
 
@@ -255,61 +260,62 @@ class EmotionPlayer:
                 if current_time >= data["time"][-1]:
                     logging.debug("Reached end of recording; setting final positions.")
                     # Set final positions for each component:
-                    for joint, goal in zip(self.reachy.l_arm.joints.values(), data["l_arm"][-1]):
-                        joint.goal_position = goal
-                    for joint, goal in zip(self.reachy.r_arm.joints.values(), data["r_arm"][-1]):
-                        joint.goal_position = goal
-                    for joint, goal in zip(self.reachy.head.joints.values(), data["head"][-1]):
-                        joint.goal_position = goal
+                    # for joint, goal in zip(self.reachy.l_arm.joints.values(), data["l_arm"][-1]):
+                    #     joint.goal_position = goal
+                    # for joint, goal in zip(self.reachy.r_arm.joints.values(), data["r_arm"][-1]):
+                    #     joint.goal_position = goal
+                    # for joint, goal in zip(self.reachy.head.joints.values(), data["head"][-1]):
+                    #     joint.goal_position = goal
 
-                    self.reachy.l_arm.gripper.goal_position = data["l_hand"][-1]
-                    self.reachy.r_arm.gripper.goal_position = data["r_hand"][-1]
-                    self.reachy.head.l_antenna.goal_position = data["l_antenna"][-1]
-                    self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
+                    # self.reachy.l_arm.gripper.goal_position = data["l_hand"][-1]
+                    # self.reachy.r_arm.gripper.goal_position = data["r_hand"][-1]
+                    # self.reachy.head.l_antenna.goal_position = data["l_antenna"][-1]
+                    # self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
 
-                    self.reachy.send_goal_positions(check_positions=False)
+                    # self.reachy.send_goal_positions(check_positions=False)
+                    self.reachy_mini.send_joints(data["reachy_mini"][-1])
 
                     logging.info("Reached end of recording normally, starting idle motion.")
 
                     # Capture the final positions as a reference.
-                    idle_final_positions = {
-                        "l_arm": {name: joint.goal_position for name, joint in self.reachy.l_arm.joints.items()},
-                        "r_arm": {name: joint.goal_position for name, joint in self.reachy.r_arm.joints.items()},
-                        "head": {name: joint.goal_position for name, joint in self.reachy.head.joints.items()},
-                        "l_hand": self.reachy.l_arm.gripper.goal_position,
-                        "r_hand": self.reachy.r_arm.gripper.goal_position,
-                        "l_antenna": self.reachy.head.l_antenna.goal_position,
-                        "r_antenna": self.reachy.head.r_antenna.goal_position,
-                    }
+                    # idle_final_positions = {
+                    #     "l_arm": {name: joint.goal_position for name, joint in self.reachy.l_arm.joints.items()},
+                    #     "r_arm": {name: joint.goal_position for name, joint in self.reachy.r_arm.joints.items()},
+                    #     "head": {name: joint.goal_position for name, joint in self.reachy.head.joints.items()},
+                    #     "l_hand": self.reachy.l_arm.gripper.goal_position,
+                    #     "r_hand": self.reachy.r_arm.gripper.goal_position,
+                    #     "l_antenna": self.reachy.head.l_antenna.goal_position,
+                    #     "r_antenna": self.reachy.head.r_antenna.goal_position,
+                    # }
 
-                    # For each joint, assign a random frequency (Hz) and phase offset.
-                    # Note : setting phase at 0 otherwise we have a discontinuity
+                    # # For each joint, assign a random frequency (Hz) and phase offset.
+                    # # Note : setting phase at 0 otherwise we have a discontinuity
 
-                    idle_params = {"l_arm": {}, "r_arm": {}, "head": {}}
-                    for group, joints in [
-                        ("l_arm", self.reachy.l_arm.joints),
-                        ("r_arm", self.reachy.r_arm.joints),
-                        ("head", self.reachy.head.joints),
-                    ]:
-                        for name in idle_final_positions[group]:
-                            freq = np.random.uniform(0.1, 0.3)  # smooth oscillation (0.1-0.3 Hz)
-                            phase = 0.0  # np.random.uniform(0, 2 * np.pi)
-                            idle_params[group][name] = (freq, phase)
+                    # idle_params = {"l_arm": {}, "r_arm": {}, "head": {}}
+                    # for group, joints in [
+                    #     ("l_arm", self.reachy.l_arm.joints),
+                    #     ("r_arm", self.reachy.r_arm.joints),
+                    #     ("head", self.reachy.head.joints),
+                    # ]:
+                    #     for name in idle_final_positions[group]:
+                    #         freq = np.random.uniform(0.1, 0.3)  # smooth oscillation (0.1-0.3 Hz)
+                    #         phase = 0.0  # np.random.uniform(0, 2 * np.pi)
+                    #         idle_params[group][name] = (freq, phase)
 
-                    # Also assign parameters for grippers and antennas.
-                    gripper_params = {
-                        "l_hand": (np.random.uniform(0.1, 0.3), 0.0),
-                        "r_hand": (np.random.uniform(0.1, 0.3), 0.0),
-                    }
-                    antenna_params = {
-                        "l_antenna": (np.random.uniform(0.1, 0.3), 0.0),
-                        "r_antenna": (np.random.uniform(0.1, 0.3), 0.0),
-                    }
+                    # # Also assign parameters for grippers and antennas.
+                    # gripper_params = {
+                    #     "l_hand": (np.random.uniform(0.1, 0.3), 0.0),
+                    #     "r_hand": (np.random.uniform(0.1, 0.3), 0.0),
+                    # }
+                    # antenna_params = {
+                    #     "l_antenna": (np.random.uniform(0.1, 0.3), 0.0),
+                    #     "r_antenna": (np.random.uniform(0.1, 0.3), 0.0),
+                    # }
 
-                    # Instead of running the idle loop inline, start it in a separate thread.
+                    # # Instead of running the idle loop inline, start it in a separate thread.
                     self.idle_stop_event.clear()
                     self.idle_thread = threading.Thread(
-                        target=self._idle_loop, args=(idle_final_positions, idle_params, gripper_params, antenna_params, 0.01)
+                        target=self._idle_loop, args=()
                     )
                     self.idle_thread.start()
                     break
@@ -331,27 +337,34 @@ class EmotionPlayer:
                     alpha = (current_time - t_prev) / (t_next - t_prev)
 
                 # Interpolate positions for each joint in left arm, right arm, and head.
-                for joint, pos_prev, pos_next in zip(
-                    self.reachy.l_arm.joints.values(), data["l_arm"][idx_prev], data["l_arm"][idx_next]
-                ):
-                    joint.goal_position = lerp(pos_prev, pos_next, alpha)
-                for joint, pos_prev, pos_next in zip(
-                    self.reachy.r_arm.joints.values(), data["r_arm"][idx_prev], data["r_arm"][idx_next]
-                ):
-                    joint.goal_position = lerp(pos_prev, pos_next, alpha)
-                for joint, pos_prev, pos_next in zip(
-                    self.reachy.head.joints.values(), data["head"][idx_prev], data["head"][idx_next]
-                ):
-                    joint.goal_position = lerp(pos_prev, pos_next, alpha)
+                # for joint, pos_prev, pos_next in zip(
+                #     self.reachy.l_arm.joints.values(), data["l_arm"][idx_prev], data["l_arm"][idx_next]
+                # ):
+                #     joint.goal_position = lerp(pos_prev, pos_next, alpha)
+                # for joint, pos_prev, pos_next in zip(
+                #     self.reachy.r_arm.joints.values(), data["r_arm"][idx_prev], data["r_arm"][idx_next]
+                # ):
+                #     joint.goal_position = lerp(pos_prev, pos_next, alpha)
+                # for joint, pos_prev, pos_next in zip(
+                #     self.reachy.head.joints.values(), data["head"][idx_prev], data["head"][idx_next]
+                # ):
+                #     joint.goal_position = lerp(pos_prev, pos_next, alpha)
+                # Interpolate for the reachy_mini joints.
+                reachy_mini_joints = data["reachy_mini"][idx_prev]
+                reachy_mini_joints_next = data["reachy_mini"][idx_next]
+                reachy_mini_joints = [
+                    lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints, reachy_mini_joints_next)
+                ]
+                self.reachy_mini.send_joints(reachy_mini_joints)
 
                 # Similarly interpolate for grippers and antennas.
-                self.reachy.l_arm.gripper.goal_position = lerp(data["l_hand"][idx_prev], data["l_hand"][idx_next], alpha)
-                self.reachy.r_arm.gripper.goal_position = lerp(data["r_hand"][idx_prev], data["r_hand"][idx_next], alpha)
-                self.reachy.head.l_antenna.goal_position = lerp(data["l_antenna"][idx_prev], data["l_antenna"][idx_next], alpha)
-                self.reachy.head.r_antenna.goal_position = lerp(data["r_antenna"][idx_prev], data["r_antenna"][idx_next], alpha)
+                # self.reachy.l_arm.gripper.goal_position = lerp(data["l_hand"][idx_prev], data["l_hand"][idx_next], alpha)
+                # self.reachy.r_arm.gripper.goal_position = lerp(data["r_hand"][idx_prev], data["r_hand"][idx_next], alpha)
+                # self.reachy.head.l_antenna.goal_position = lerp(data["l_antenna"][idx_prev], data["l_antenna"][idx_next], alpha)
+                # self.reachy.head.r_antenna.goal_position = lerp(data["r_antenna"][idx_prev], data["r_antenna"][idx_next], alpha)
 
                 # Send the updated positions to the robot.
-                self.reachy.send_goal_positions(check_positions=False)
+                # self.reachy.send_goal_positions(check_positions=False)
 
                 calculation_duration = time.time() - t0 - current_time
                 margin = dt - calculation_duration
