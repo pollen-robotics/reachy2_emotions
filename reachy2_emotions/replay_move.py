@@ -99,14 +99,21 @@ class EmotionPlayer:
     def _idle_loop(self):
         logging.info("Starting idle animation loop.")
         # Define idle animation parameters.
-        idle_amplitude = 0.5  # maximum offset magnitude
+        idle_amplitude = 0.01  # maximum offset magnitude
         idle_amplitude_antenna = 10.0
         idle_amplitude_gripper = 10.0
         idle_start_time = time.time()
         while not self.idle_stop_event.is_set():
-            # t_idle = time.time() - idle_start_time
+            t_idle = time.time() - idle_start_time
             print("Idle loop")
-            self.reachy_mini.send_joints([0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.5, 0.0])
+            # self.reachy_mini.send_joints([0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.5, 0.0])
+
+            pose = np.eye(4)
+            position = np.array([0.0, 0.0, 0.0 + idle_amplitude * np.sin(2 * np.pi * 0.1 * t_idle)])
+            pose[:3, 3] = position
+            self.reachy_mini.send_pose(pose, antennas=[-0.5, 0.5], offset_zero=True)
+
+
             # # Update arm and head joints with smooth sinusoidal idle offsets.
             # for group, joints in [
             #     ("l_arm", self.reachy.l_arm.joints),
