@@ -16,7 +16,9 @@ import sounddevice as sd
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 # from reachy2_sdk import ReachySDK  # type: ignore
-from stewart_little_control import Client
+# from stewart_little_control import Client
+from reachy_mini import ReachyMini
+
 
 
 from reachy2_emotions.utils import (
@@ -59,7 +61,9 @@ class EmotionPlayer:
         self.lock = threading.Lock()
         try:
             # self.reachy = ReachySDK(host=self.ip)
-            self.reachy_mini = Client()
+            # self.reachy_mini = Client()
+            self.reachy_mini = ReachyMini(spawn_daemon=True, use_sim=True)
+
 
         except Exception as e:
             logging.error(f"Error connecting to Reachy in constructor: {e}")
@@ -105,13 +109,18 @@ class EmotionPlayer:
         idle_start_time = time.time()
         while not self.idle_stop_event.is_set():
             t_idle = time.time() - idle_start_time
-            print("Idle loop")
             # self.reachy_mini.send_joints([0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.5, 0.0])
 
             pose = np.eye(4)
             position = np.array([0.0, 0.0, 0.0 + idle_amplitude * np.sin(2 * np.pi * 0.1 * t_idle)])
             pose[:3, 3] = position
-            self.reachy_mini.send_pose(pose, antennas=[-0.5, 0.5], offset_zero=True)
+            self.reachy_mini.set_position(head=pose, antennas=np.array([0.5, -0.5]))
+
+            # self.reachy_mini.set_position(head=np.eye(4), antennas=np.array([0.5, -0.5]))
+            # joints = self.reachy_mini._get_current_joint_positions()
+            # print(f"Current joints: {joints}")
+            
+
 
 
             # # Update arm and head joints with smooth sinusoidal idle offsets.
@@ -213,6 +222,7 @@ class EmotionPlayer:
         # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
         playback_offset = 1.6
         try:
+            print("Moving to initial position...")
             if first_duration > 0.0:
                 current_time = playback_offset
                 index = bisect.bisect_right(data["time"], current_time)
@@ -229,7 +239,7 @@ class EmotionPlayer:
                 # l_antenna_goal = data["l_antenna"][index]
                 # r_antenna_goal = data["r_antenna"][index]
                 reachy_mini_goal_joints = data["reachy_mini"][index]
-                reachy_mini_joints = self.reachy_mini.get_joint_positions()
+                reachy_mini_joints = self.reachy_mini._get_current_joint_positions()
                 # l_gripper_pos = self.reachy.l_arm.gripper.present_position
                 # r_gripper_pos = self.reachy.r_arm.gripper.present_position
                 # l_antenna_pos = self.reachy.head.l_antenna.present_position
@@ -237,12 +247,9 @@ class EmotionPlayer:
                 t0 = time.time()
                 while time.time() - t0 < first_duration:
                     alpha = (time.time() - t0) / first_duration
-                    self.reachy_mini.send_joints(
-                        [
-                            lerp(pos_prev, pos_next, alpha)
-                            for pos_prev, pos_next in zip(reachy_mini_joints, reachy_mini_goal_joints)
-                        ]
-                    )
+                    head_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints[0], reachy_mini_goal_joints[0])])
+                    antennas_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints[1], reachy_mini_goal_joints[1])])
+                    self.reachy_mini._send_joint_command(head_joints, antennas_joints)
                     # self.reachy.l_arm.gripper.goal_position = lerp(l_gripper_pos, l_gripper_goal, alpha)
                     # self.reachy.r_arm.gripper.goal_position = lerp(r_gripper_pos, r_gripper_goal, alpha)
                     # self.reachy.head.l_antenna.goal_position = lerp(l_antenna_pos, l_antenna_goal, alpha)
@@ -271,7 +278,6 @@ class EmotionPlayer:
         try:
             while not self.stop_event.is_set():
                 current_time = time.time() - t0  # elapsed time since playback started
-
                 # If we've reached or passed the last recorded time, use the final positions.
                 if current_time >= data["time"][-1]:
                     logging.debug("Reached end of recording; setting final positions.")
@@ -289,10 +295,9 @@ class EmotionPlayer:
                     # self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
 
                     # self.reachy.send_goal_positions(check_positions=False)
-                    self.reachy_mini.send_joints(data["reachy_mini"][-1])
+                    self.reachy_mini._send_joint_command(data["reachy_mini"][-1][0], data["reachy_mini"][-1][1])
 
                     logging.info("Reached end of recording normally, starting idle motion.")
-
                     # Capture the final positions as a reference.
                     # idle_final_positions = {
                     #     "l_arm": {name: joint.goal_position for name, joint in self.reachy.l_arm.joints.items()},
@@ -327,19 +332,29 @@ class EmotionPlayer:
                     #     "l_antenna": (np.random.uniform(0.1, 0.3), 0.0),
                     #     "r_antenna": (np.random.uniform(0.1, 0.3), 0.0),
                     # }
-                    reachy_mini_goal_joints = [0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.5, 0.0]
-                    reachy_mini_joints = self.reachy_mini.get_joint_positions()
-                    duration = 1
-                    t0 = time.time()
-                    while time.time() - t0 < duration:
-                        alpha = (time.time() - t0) / duration
-                        self.reachy_mini.send_joints(
-                            [
-                                lerp(pos_prev, pos_next, alpha)
-                                for pos_prev, pos_next in zip(reachy_mini_joints, reachy_mini_goal_joints)
-                            ]
-                        )
-                        time.sleep(0.01)
+                    # print("Starting idle loop")
+                    # reachy_mini_goal_joints = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    reachy_mini_antennas_goal_joints = [0.5, -0.5]
+                    # reachy_mini_joints = self.reachy_mini._get_current_joint_positions()
+                    # duration = 1
+                    # t0 = time.time()
+                    # while time.time() - t0 < duration:
+                    #     alpha = (time.time() - t0) / duration
+                    #     print(f"alpha: {alpha:.2f}, reachy_mini_joints: {reachy_mini_joints}, reachy_mini_goal_joints: {reachy_mini_goal_joints}")
+                    #     head_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints[0], reachy_mini_goal_joints)])
+                    #     antennas_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints[1], reachy_mini_antennas_goal_joints)])
+                    #     print(f"head_joints: {head_joints}, antennas_joints: {antennas_joints}")
+                    #     self.reachy_mini._send_joint_command(head_joints, antennas_joints)
+                    #     print(f"Sending joints: {head_joints}, {antennas_joints}")
+                    #     # self.reachy_mini.send_joints(
+                    #     #     [
+                    #     #         lerp(pos_prev, pos_next, alpha)
+                    #     #         for pos_prev, pos_next in zip(reachy_mini_joints, reachy_mini_goal_joints)
+                    #     #     ]
+                    #     # )
+                    #     time.sleep(0.01)
+
+                    self.reachy_mini.goto_position(np.eye(4), reachy_mini_antennas_goal_joints)
 
                     # # Instead of running the idle loop inline, start it in a separate thread.
                     self.idle_stop_event.clear()
@@ -381,10 +396,13 @@ class EmotionPlayer:
                 # Interpolate for the reachy_mini joints.
                 reachy_mini_joints = data["reachy_mini"][idx_prev]
                 reachy_mini_joints_next = data["reachy_mini"][idx_next]
-                reachy_mini_joints = [
-                    lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints, reachy_mini_joints_next)
-                ]
-                self.reachy_mini.send_joints(reachy_mini_joints)
+                # reachy_mini_joints = [
+                #     lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints, reachy_mini_joints_next)
+                # ]
+                head_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints[0], reachy_mini_joints_next[0])])
+                antennas_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(reachy_mini_joints[1], reachy_mini_joints_next[1])])
+                self.reachy_mini._send_joint_command(head_joints, antennas_joints)
+                # self.reachy_mini.send_joints(reachy_mini_joints)
 
                 # Similarly interpolate for grippers and antennas.
                 # self.reachy.l_arm.gripper.goal_position = lerp(data["l_hand"][idx_prev], data["l_hand"][idx_next], alpha)

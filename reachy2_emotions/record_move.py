@@ -10,7 +10,8 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 # from reachy2_sdk import ReachySDK  # type: ignore
-from stewart_little_control import Client
+# from stewart_little_control import Client
+from reachy_mini import ReachyMini
 
 
 from reachy2_emotions.utils import RECORD_FOLDER
@@ -19,7 +20,8 @@ from reachy2_emotions.utils import RECORD_FOLDER
 def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: str) -> None:
     # connect to Reachy
     # reachy = ReachySDK(host=ip)
-    reachy_mini = Client()
+    # reachy_mini = Client()
+    reachy_mini = ReachyMini(spawn_daemon=True, use_sim=True)
     # Data container for robot motion
     data: dict = {
         "time": [],
@@ -64,7 +66,8 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 
         while True:
             # Get current positions from Reachy
-            reachy_mini_joints = reachy_mini.get_joint_positions()
+            reachy_mini_joints = reachy_mini._get_current_joint_positions()
+            print(reachy_mini_joints)
 
             # Save timestamp and joint data
             data["time"].append(time.time() - t0)
@@ -80,7 +83,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 
         os.makedirs(directory, exist_ok=True)
 
-        # Save motion data to JSON file
+        # Save motion data to JSON filereachy_mini
         full_filename = filename + ".json"
         file_path = os.path.join(directory, full_filename)
         with open(file_path, "w") as f:
