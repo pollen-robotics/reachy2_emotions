@@ -73,6 +73,8 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
         # Stop recording and retrieve the logged data
         recorded_motion = mini.stop_recording()
         print(f"\nRecording stopped. {len(recorded_motion)} motion frames captured.")
+        print(f"Duration of recording: {time.time() - t0:.2f} seconds")
+        
         
         # Populate the 'data' dictionary from the retrieved 'recorded_motion' list
         for frame in recorded_motion:
@@ -101,7 +103,6 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
         print(f"Robot motion data saved to {file_path}.")
-        print(f"Time of recording: {time.time() - t0:.2f} seconds")
 
         # Save recorded audio to a WAV file.
         if audio_frames:
