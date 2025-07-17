@@ -14,15 +14,14 @@ import soundfile as sf
 from reachy_mini import ReachyMini
 
 
+
 from reachy2_emotions.utils import RECORD_FOLDER
 
 
 def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: str) -> None:
-    # connect to Reachy
-    # reachy = ReachySDK(host=ip)
-    # reachy_mini = Client()
-    reachy_mini = ReachyMini(spawn_daemon=True, use_sim=True)
-    # Data container for robot motion
+    mini = ReachyMini()
+    
+    # This data structure will be populated with the processed recording at the end.
     data: dict = {
         "time": [],
         "reachy_mini": [],
@@ -62,28 +61,41 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
 
     try:
         t0 = time.time()
-        print("Recording in progress, press Ctrl+C to stop")
+        # Start the recording.
+        mini.start_recording()
+        print("\nRecording started. Press Ctrl+C here to stop recording.")
 
         while True:
-            # Get current positions from Reachy
-            reachy_mini_joints = reachy_mini._get_current_joint_positions()
-            print(reachy_mini_joints)
-
-            # Save timestamp and joint data
-            data["time"].append(time.time() - t0)
-            data["reachy_mini"].append(reachy_mini_joints)
-
-            time.sleep(1 / freq)  # TODO should be adjusted to match the desired frequency
+            # Keep the script alive to listen for Ctrl+C
+            time.sleep(0.01) 
+            
     except KeyboardInterrupt:
+        # Stop recording and retrieve the logged data
+        recorded_motion = mini.stop_recording()
+        print(f"\nRecording stopped. {len(recorded_motion)} motion frames captured.")
+        
+        # Populate the 'data' dictionary from the retrieved 'recorded_motion' list
+        for frame in recorded_motion:
+            data["time"].append(frame.get("time"))
+            # Each "reachy_mini" entry will contain the pose data for that frame
+            pose_info = {
+                'head': frame.get('head'),
+                'antennas': frame.get('antennas'),
+                'body_yaw': frame.get('body_yaw'),
+                'check_collision': frame.get('check_collision'),
+            }
+            data["reachy_mini"].append(pose_info)
+        # ---
+        
         # Stop the audio stream
         audio_stream.stop()
         audio_stream.close()
+        
         # Create recordings folder if needed
         directory = pathlib.Path(record_folder)
-
         os.makedirs(directory, exist_ok=True)
 
-        # Save motion data to JSON filereachy_mini
+        # Save motion data to JSON file
         full_filename = filename + ".json"
         file_path = os.path.join(directory, full_filename)
         with open(file_path, "w") as f:
