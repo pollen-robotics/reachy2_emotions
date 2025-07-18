@@ -15,7 +15,8 @@ import soundfile as sf
 from reachy2_sdk import ReachySDK  # type: ignore
 
 # Folder with recordings (JSON + corresponding WAV files)
-RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
+# RECORD_FOLDER = pathlib.Path(__file__).resolve().parent.parent / "data" / "recordings"
+RECORD_FOLDER = "/home/remi/reachy_mini/examples/emotions"
 
 
 # Print all available emotions

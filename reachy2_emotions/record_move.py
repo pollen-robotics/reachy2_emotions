@@ -24,7 +24,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
     # This data structure will be populated with the processed recording at the end.
     data: dict = {
         "time": [],
-        "reachy_mini": [],
+        "set_target_data": [],
     }
 
     # --- Setup Audio Recording ---
@@ -79,14 +79,14 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
         # Populate the 'data' dictionary from the retrieved 'recorded_motion' list
         for frame in recorded_motion:
             data["time"].append(frame.get("time"))
-            # Each "reachy_mini" entry will contain the pose data for that frame
+            # Each "set_target_data" entry will contain the pose data for that frame
             pose_info = {
                 'head': frame.get('head'),
                 'antennas': frame.get('antennas'),
                 'body_yaw': frame.get('body_yaw'),
                 'check_collision': frame.get('check_collision'),
             }
-            data["reachy_mini"].append(pose_info)
+            data["set_target_data"].append(pose_info)
         # ---
         
         # Stop the audio stream
