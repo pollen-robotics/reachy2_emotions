@@ -21,7 +21,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
     # connect to Reachy
     # reachy = ReachySDK(host=ip)
     # reachy_mini = Client()
-    reachy_mini = ReachyMini(spawn_daemon=True, use_sim=True)
+    reachy_mini = ReachyMini(spawn_daemon=True, use_sim=False)
     # Data container for robot motion
     data: dict = {
         "time": [],
