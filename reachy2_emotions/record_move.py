@@ -23,6 +23,7 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
     
     # This data structure will be populated with the processed recording at the end.
     data: dict = {
+        "description": "TODO: Add a description of the recording. You can add as much as you want, even if the wording is not perfect.",
         "time": [],
         "set_target_data": [],
     }
