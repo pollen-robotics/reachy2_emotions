@@ -37,6 +37,36 @@ from reachy2_emotions.utils import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
+def delta_angle_between_mat_rot(P, Q):
+    """Compute the angle between two rotation matrices P and Q.
+
+    Think of this as an angular distance in the axis-angle representation.
+    """
+    # https://math.stackexchange.com/questions/2113634/comparing-two-rotation-matrices
+    # http://www.boris-belousov.net/2016/12/01/quat-dist/
+    R = np.dot(P, Q.T)
+    tr = (np.trace(R) - 1) / 2
+    if tr > 1.0:
+        tr = 1.0
+    elif tr < -1.0:
+        tr = -1.0
+    return np.arccos(tr)
+
+
+def unhinged_distance_between_poses(pose1, pose2) -> float:
+    """Compute the distance between two poses in 6D space.
+
+    Units be dammned, it is a well known fact that 1°==1mm and I'm tired of
+    of pretending otherwise.
+    """
+    distance_translation = np.linalg.norm(pose1[:3, 3] - pose2[:3, 3])
+    distance_angle = delta_angle_between_mat_rot(pose1[:3, :3], pose2[:3, :3])
+
+    unhinged_distance = distance_translation * 1000 + np.rad2deg(distance_angle)
+
+    return unhinged_distance
+
+
 class EmotionPlayer:
     """
     This class wraps the replay functionality (motion + audio) for an emotion.
@@ -94,6 +124,23 @@ class EmotionPlayer:
         logging.info("Starting idle animation loop.")
         # Define idle animation parameters.
         idle_amplitude = 0.01  # maximum offset magnitude
+        cur_head_joints, _ = self.reachy_mini._get_current_joint_positions()
+        current_head_pose = self.reachy_mini.head_kinematics.fk(cur_head_joints)
+        distance_to_goal = unhinged_distance_between_poses(
+            np.eye(4), 
+            current_head_pose,
+        )
+        ms_per_magic_mm = 20
+        duration = distance_to_goal * ms_per_magic_mm / 1000
+        # Interpolation phase to reach the first target pose.
+        self.reachy_mini.goto_target(
+            np.eye(4),
+            antennas=(0,0),
+            body_yaw=0.0,
+            check_collision=False,
+            duration=duration,
+            method="cartoon",
+        )
         idle_start_time = time.time()
         while not self.idle_stop_event.is_set():
             t_idle = time.time() - idle_start_time
@@ -145,8 +192,15 @@ class EmotionPlayer:
         else:
             logging.debug("No audio file found; only motion replay will be executed.")
 
-        # TODO scale interpolation time based on distance
-        first_duration = 0.0
+        cur_head_joints, _ = self.reachy_mini._get_current_joint_positions()
+        current_head_pose = self.reachy_mini.head_kinematics.fk(cur_head_joints)
+        distance_to_goal = unhinged_distance_between_poses(
+            np.array(data["set_target_data"][0]["head"]),
+            current_head_pose,
+        )
+        ms_per_magic_mm = 20
+        first_duration = distance_to_goal * ms_per_magic_mm / 1000
+        logging.info(f"First target pose distance: {distance_to_goal:.2f} in magic mm (1°==1mm), estimated duration: {first_duration:.2f} seconds.")
 
 
         start_event = threading.Event()
@@ -165,7 +219,15 @@ class EmotionPlayer:
         # Recordings have a "BIP" at 1.5 seconds, so we start at 1.6 seconds. The sound file has also been trimmed.
         playback_offset = 1.6
         
-        # TODO: I removed the interpolation phase for now.
+        # Interpolation phase to reach the first target pose.
+        self.reachy_mini.goto_target(
+            np.array(data["set_target_data"][0]["head"]),
+            antennas=data["set_target_data"][0]["antennas"],
+            body_yaw=data["set_target_data"][0].get("body_yaw", 0.0),
+            check_collision=data["set_target_data"][0].get("check_collision", False),
+            duration=first_duration,
+            method="cartoon",
+        )
 
         start_event.set()
 
