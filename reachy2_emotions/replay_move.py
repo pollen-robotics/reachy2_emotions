@@ -87,6 +87,8 @@ class EmotionPlayer:
         self.record_folder = record_folder
         self.auto_start = auto_start  # In server mode, auto_start is True (no prompt)
         self.max_joint_speed = 40.0  # degrees per second. Tunned on robot
+        self.ms_per_degree = 40
+        self.ms_per_magic_mm = 20 
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -124,22 +126,34 @@ class EmotionPlayer:
         logging.info("Starting idle animation loop.")
         # Define idle animation parameters.
         idle_amplitude = 0.01  # maximum offset magnitude
-        cur_head_joints, _ = self.reachy_mini._get_current_joint_positions()
+        cur_head_joints, cur_antenna_joints = self.reachy_mini._get_current_joint_positions()
         current_head_pose = self.reachy_mini.head_kinematics.fk(cur_head_joints)
         distance_to_goal = unhinged_distance_between_poses(
             np.eye(4), 
             current_head_pose,
         )
-        ms_per_magic_mm = 20
-        duration = distance_to_goal * ms_per_magic_mm / 1000
+        
+        antenna_dist = max(abs(cur_antenna_joints - np.array([0,0])))
+        antenna_dist = np.rad2deg(antenna_dist)
+        antenna_interpol_duration = antenna_dist * self.ms_per_degree / 1000
+        print(f"Current antenna distance: {antenna_dist:.2f} degrees")
+
+        head_interpol_duration = distance_to_goal * self.ms_per_magic_mm / 1000
+        
+        first_duration = max(head_interpol_duration, antenna_interpol_duration)
+        logging.info(f"First target pose distance: {distance_to_goal:.0f} in magic mm (1°==1mm) => {head_interpol_duration*1000:.0f} ms")
+        logging.info(f"First target antenna distance: {antenna_dist:.0f}° => {antenna_interpol_duration*1000:.0f} ms")
+        logging.info(f"==> First target pose duration: {first_duration*1000:.0f} ms")
+        
+
         # Interpolation phase to reach the first target pose.
         self.reachy_mini.goto_target(
             np.eye(4),
             antennas=(0,0),
             body_yaw=0.0,
             check_collision=False,
-            duration=duration,
-            method="cartoon",
+            duration=first_duration,
+            method="minjerk",
         )
         idle_start_time = time.time()
         while not self.idle_stop_event.is_set():
@@ -147,9 +161,10 @@ class EmotionPlayer:
             # self.reachy_mini.send_joints([0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.5, 0.0])
 
             pose = np.eye(4)
+            antenna_target = np.deg2rad(15) * np.sin(2 * np.pi * 0.5 * t_idle)
             position = np.array([0.0, 0.0, 0.0 + idle_amplitude * np.sin(2 * np.pi * 0.1 * t_idle)])
             pose[:3, 3] = position
-            self.reachy_mini.set_target(head=pose, antennas=np.array([0.5, -0.5]))
+            self.reachy_mini.set_target(head=pose, antennas=np.array([antenna_target, -antenna_target]))
             time.sleep(0.01)
         logging.info("Idle animation loop stopped.")
 
@@ -192,15 +207,23 @@ class EmotionPlayer:
         else:
             logging.debug("No audio file found; only motion replay will be executed.")
 
-        cur_head_joints, _ = self.reachy_mini._get_current_joint_positions()
+        cur_head_joints, cur_antenna_joints = self.reachy_mini._get_current_joint_positions()
         current_head_pose = self.reachy_mini.head_kinematics.fk(cur_head_joints)
         distance_to_goal = unhinged_distance_between_poses(
             np.array(data["set_target_data"][0]["head"]),
             current_head_pose,
         )
-        ms_per_magic_mm = 20
-        first_duration = distance_to_goal * ms_per_magic_mm / 1000
-        logging.info(f"First target pose distance: {distance_to_goal:.2f} in magic mm (1°==1mm), estimated duration: {first_duration:.2f} seconds.")
+        antenna_dist = max(abs(cur_antenna_joints - np.array(data["set_target_data"][0]["antennas"])))
+        antenna_dist = np.rad2deg(antenna_dist)
+        antenna_interpol_duration = antenna_dist * self.ms_per_degree / 1000
+        print(f"Current antenna distance: {antenna_dist:.2f} degrees")
+
+        head_interpol_duration = distance_to_goal * self.ms_per_magic_mm / 1000
+        
+        first_duration = max(head_interpol_duration, antenna_interpol_duration)
+        logging.info(f"First target pose distance: {distance_to_goal:.0f} in magic mm (1°==1mm) => {head_interpol_duration*1000:.0f} ms")
+        logging.info(f"First target antenna distance: {antenna_dist:.0f}° => {antenna_interpol_duration*1000:.0f} ms")
+        logging.info(f"==> First target pose duration: {first_duration*1000:.0f} ms")
 
 
         start_event = threading.Event()
@@ -226,7 +249,7 @@ class EmotionPlayer:
             body_yaw=data["set_target_data"][0].get("body_yaw", 0.0),
             check_collision=data["set_target_data"][0].get("check_collision", False),
             duration=first_duration,
-            method="cartoon",
+            method="minjerk",
         )
 
         start_event.set()
