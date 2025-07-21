@@ -29,9 +29,9 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
     }
 
     audio_stream = None
+    sample_rate = 44100  # samples per second (you can adjust as needed)
     if record_audio:
         # --- Setup Audio Recording ---
-        sample_rate = 44100  # samples per second (you can adjust as needed)
         channels = 1  # mono recording; use 2 for stereo
         audio_frames = []  # will store chunks of recorded audio
 
@@ -51,16 +51,16 @@ def record(ip: str, filename: str, freq: int, audio_device: str, record_folder: 
             print(sd.query_devices())
             return
 
-        # --- Schedule a beep sound 1 second after start ---
-        def beep():
-            duration = 0.2  # Beep duration in seconds
-            freq_beep = 440  # Frequency in Hz
-            t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-            beep_sound = 0.5 * np.sin(2 * np.pi * freq_beep * t)
-            sd.play(beep_sound, sample_rate)
-            sd.wait()  # Wait until the beep finishes playing
+    # --- Schedule a beep sound 1 second after start ---
+    def beep():
+        duration = 0.2  # Beep duration in seconds
+        freq_beep = 440  # Frequency in Hz
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        beep_sound = 0.5 * np.sin(2 * np.pi * freq_beep * t)
+        sd.play(beep_sound, sample_rate)
+        sd.wait()  # Wait until the beep finishes playing
 
-        threading.Timer(1.5, beep).start()
+    threading.Timer(1.5, beep).start()
 
     try:
         t0 = time.time()
