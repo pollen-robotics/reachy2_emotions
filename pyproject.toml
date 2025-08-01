@@ -11,12 +11,10 @@ authors = [
 urls = { "Homepage" = "https://github.com/pollen-robotics/reachy2_emotions" }
 
 dependencies = [
-  "numpy >=1.24.0, <=1.26.4",
   "sounddevice",
   "soundfile",
   "Flask >=2.0.0",
   "flask-cors",
-  "reachy2-sdk >=1.0.0, <2.0.0"
 ]
 
 [project.optional-dependencies]
