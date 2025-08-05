@@ -18,7 +18,7 @@ from flask_cors import CORS
 # from reachy2_sdk import ReachySDK  # type: ignore
 # from stewart_little_control import Client
 from reachy_mini import ReachyMini
-from reachy_mini.utils.interpolation import linear_pose_interpolation
+from reachy_mini.utils.interpolation import linear_pose_interpolation, distance_between_poses
 
 
 
@@ -51,20 +51,6 @@ def delta_angle_between_mat_rot(P, Q):
     elif tr < -1.0:
         tr = -1.0
     return np.arccos(tr)
-
-
-def unhinged_distance_between_poses(pose1, pose2) -> float:
-    """Compute the distance between two poses in 6D space.
-
-    Units be dammned, it is a well known fact that 1°==1mm and I'm tired of
-    of pretending otherwise.
-    """
-    distance_translation = np.linalg.norm(pose1[:3, 3] - pose2[:3, 3])
-    distance_angle = delta_angle_between_mat_rot(pose1[:3, :3], pose2[:3, :3])
-
-    unhinged_distance = distance_translation * 1000 + np.rad2deg(distance_angle)
-
-    return unhinged_distance
 
 
 class EmotionPlayer:
@@ -128,7 +114,7 @@ class EmotionPlayer:
         idle_amplitude = 0.01  # maximum offset magnitude
         cur_head_joints, cur_antenna_joints = self.reachy_mini.get_current_joint_positions()
         current_head_pose = self.reachy_mini.get_current_head_pose()
-        distance_to_goal = unhinged_distance_between_poses(
+        _, _, distance_to_goal = distance_between_poses(
             np.eye(4), 
             current_head_pose,
         )
@@ -210,7 +196,7 @@ class EmotionPlayer:
         cur_head_joints, cur_antenna_joints = self.reachy_mini.get_current_joint_positions()
         current_head_pose = self.reachy_mini.get_current_head_pose()
         
-        distance_to_goal = unhinged_distance_between_poses(
+        _, _, distance_to_goal = distance_between_poses(
             np.array(data["set_target_data"][0]["head"]),
             current_head_pose,
         )
