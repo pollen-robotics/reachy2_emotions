@@ -87,8 +87,8 @@ class EmotionPlayer:
         self.record_folder = record_folder
         self.auto_start = auto_start  # In server mode, auto_start is True (no prompt)
         self.max_joint_speed = 40.0  # degrees per second. Tunned on robot
-        self.ms_per_degree = 40
-        self.ms_per_magic_mm = 20 
+        self.ms_per_degree = 10
+        self.ms_per_magic_mm = 10 
         self.thread = None
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -126,8 +126,8 @@ class EmotionPlayer:
         logging.info("Starting idle animation loop.")
         # Define idle animation parameters.
         idle_amplitude = 0.01  # maximum offset magnitude
-        cur_head_joints, cur_antenna_joints = self.reachy_mini._get_current_joint_positions()
-        current_head_pose = self.reachy_mini.head_kinematics.fk(cur_head_joints)
+        cur_head_joints, cur_antenna_joints = self.reachy_mini.get_current_joint_positions()
+        current_head_pose = self.reachy_mini.get_current_head_pose()
         distance_to_goal = unhinged_distance_between_poses(
             np.eye(4), 
             current_head_pose,
@@ -207,8 +207,9 @@ class EmotionPlayer:
         else:
             logging.debug("No audio file found; only motion replay will be executed.")
 
-        cur_head_joints, cur_antenna_joints = self.reachy_mini._get_current_joint_positions()
-        current_head_pose = self.reachy_mini.head_kinematics.fk(cur_head_joints)
+        cur_head_joints, cur_antenna_joints = self.reachy_mini.get_current_joint_positions()
+        current_head_pose = self.reachy_mini.get_current_head_pose()
+        
         distance_to_goal = unhinged_distance_between_poses(
             np.array(data["set_target_data"][0]["head"]),
             current_head_pose,
@@ -432,6 +433,48 @@ def run_all_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: fl
         # Optional short pause between emotions
         time.sleep(0.5)
 
+def run_scripted_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: float):
+    player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
+    emotions_delay = [("enthusiastic1", 5.5), ("welcoming2", 5.0), ("laughing1", 0.5), ] #("resigned1", 2.0), ] 
+    death_look = np.array([
+        [ 0.92037855, -0.3900239,   0.02801237, -0.01335223],
+        [ 0.39013759,  0.92075533,  0.00151064, -0.00303172],
+        [-0.02638172,  0.00953832,  0.99960644,  0.0163515 ],
+        [ 0.0,         0.0,         0.0,         1.0       ]
+    ])
+    
+    input("press enter to start scripted emotions")
+    
+    for emotion, delay in emotions_delay:
+        print("\n" + "=" * 40)
+        print(f"==== PLAYING EMOTION: {emotion.upper()} ====")
+        print("=" * 40 + "\n")
+        player.play_emotion(emotion)
+        if player.thread:
+            player.thread.join()
+        time.sleep(delay)  # Wait for the specified delay before the next emotion
+        
+    with player.lock:
+        player.stop()  # Stop current playback if any.
+        # Stop idle thread if it's running.
+        if player.idle_thread and player.idle_thread.is_alive():
+            player.idle_stop_event.set()
+            player.idle_thread.join()
+            player.idle_stop_event.clear()
+        player.stop_event.clear()
+    player.reachy_mini.goto_target(head=death_look, antennas=np.array([0.0, 0.0]), body_yaw=0.0, check_collision=False, duration=2.0)
+
+    time.sleep(3.0)
+        
+
+    player.play_emotion("resigned1")
+    if player.thread:
+        player.thread.join()
+    time.sleep(20000.0)
+    
+    
+    
+
 
 # ------------------------------------------------------------------------------
 # Main entry point
@@ -451,6 +494,7 @@ def main():
     parser.add_argument("--server", action="store_true", help="Run in Flask server mode to accept emotion requests")
     parser.add_argument("--flask-port", type=int, default=5001, help="Port for the Flask server (default: 5001)")
     parser.add_argument("--all-emotions", action="store_true", help="Play all available emotions sequentially.")
+    parser.add_argument("--script", action="store_true", help="Plays a scripted sequence of emotions.")
     parser.add_argument("--list", action="store_true", help="Print all available emotions")
 
     args = parser.parse_args()
@@ -461,6 +505,8 @@ def main():
 
     if args.all_emotions:
         run_all_emotions_mode(args.ip, args.audio_device, args.audio_offset)
+    elif args.script:
+        run_scripted_emotions_mode(args.ip, args.audio_device, args.audio_offset)
     elif args.list:
         print_available_emotions()
     elif args.server:
