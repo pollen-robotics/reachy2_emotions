@@ -137,7 +137,6 @@ class EmotionPlayer:
             np.eye(4),
             antennas=(0,0),
             body_yaw=0.0,
-            check_collision=False,
             duration=first_duration,
             method="minjerk",
         )
@@ -234,7 +233,6 @@ class EmotionPlayer:
             np.array(data["set_target_data"][0]["head"]),
             antennas=data["set_target_data"][0]["antennas"],
             body_yaw=data["set_target_data"][0].get("body_yaw", 0.0),
-            check_collision=data["set_target_data"][0].get("check_collision", False),
             duration=first_duration,
             method="minjerk",
         )
@@ -291,7 +289,6 @@ class EmotionPlayer:
                 antennas_next = data["set_target_data"][idx_next]["antennas"]
                 body_yaw_prev = data["set_target_data"][idx_prev].get("body_yaw", 0.0)
                 body_yaw_next = data["set_target_data"][idx_next].get("body_yaw", 0.0)
-                check_collision = data["set_target_data"][idx_prev].get("check_collision", False)
                 
 
                 # Interpolate to infer a better position at the current time.
@@ -301,7 +298,7 @@ class EmotionPlayer:
                 
                 # Head position interpolation is more complex:
                 head_pose = linear_pose_interpolation(head_prev, head_next, alpha)
-                self.reachy_mini.set_target(head_pose, antennas_joints, body_yaw=body_yaw, check_collision=check_collision)
+                self.reachy_mini.set_target(head_pose, antennas_joints, body_yaw=body_yaw)
 
                 calculation_duration = time.time() - t0 - current_time
                 margin = dt - calculation_duration
@@ -448,7 +445,7 @@ def run_scripted_emotions_mode(ip: str, audio_device: Optional[str], audio_offse
             player.idle_thread.join()
             player.idle_stop_event.clear()
         player.stop_event.clear()
-    player.reachy_mini.goto_target(head=death_look, antennas=np.array([0.0, 0.0]), body_yaw=0.0, check_collision=False, duration=2.0)
+    player.reachy_mini.goto_target(head=death_look, antennas=np.array([0.0, 0.0]), body_yaw=0.0, duration=2.0)
 
     time.sleep(3.0)
         
