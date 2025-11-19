@@ -130,8 +130,8 @@ def _replay_thread_smart_interpol(self, filename: str):
                     joint.goal_position = goal
                 self.reachy.l_arm.gripper.goal_position = data["l_hand"][-1]
                 self.reachy.r_arm.gripper.goal_position = data["r_hand"][-1]
-                self.reachy.head.l_antenna.goal_position = data["l_antenna"][-1]
-                self.reachy.head.r_antenna.goal_position = data["r_antenna"][-1]
+                self.reachy.head.l_antenna.goal_position = -data["l_antenna"][-1]
+                self.reachy.head.r_antenna.goal_position = -data["r_antenna"][-1]
                 self.reachy.send_goal_positions(check_positions=False)
 
                 logging.info("Reached end of recording normally, starting idle motion.")
@@ -211,14 +211,14 @@ def _replay_thread_smart_interpol(self, filename: str):
             self.reachy.r_arm.gripper.goal_position = new_goal
 
             # Update left antenna.
-            current_goal = self.reachy.head.l_antenna.goal_position
+            current_goal = -self.reachy.head.l_antenna.goal_position
             new_goal = update_goal(data["l_antenna"], current_time, dt_loop, current_goal, self.max_joint_speed)
-            self.reachy.head.l_antenna.goal_position = new_goal
+            self.reachy.head.l_antenna.goal_position = -new_goal
 
             # Update right antenna.
-            current_goal = self.reachy.head.r_antenna.goal_position
+            current_goal = -self.reachy.head.r_antenna.goal_position
             new_goal = update_goal(data["r_antenna"], current_time, dt_loop, current_goal, self.max_joint_speed)
-            self.reachy.head.r_antenna.goal_position = new_goal
+            self.reachy.head.r_antenna.goal_position = -new_goal
 
             with self.send_lock:
                 self.reachy.send_goal_positions(check_positions=False)

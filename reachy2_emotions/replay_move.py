@@ -149,7 +149,8 @@ class EmotionPlayer:
             antenna_target = np.deg2rad(15) * np.sin(2 * np.pi * 0.5 * t_idle)
             position = np.array([0.0, 0.0, 0.0 + idle_amplitude * np.sin(2 * np.pi * 0.1 * t_idle)])
             pose[:3, 3] = position
-            self.reachy_mini.set_target(head=pose, antennas=np.array([antenna_target, -antenna_target]))
+            antenna_targets = -np.array([antenna_target, -antenna_target])
+            self.reachy_mini.set_target(head=pose, antennas=antenna_targets)
             time.sleep(0.01)
         logging.info("Idle animation loop stopped.")
 
@@ -231,7 +232,7 @@ class EmotionPlayer:
         # Interpolation phase to reach the first target pose.
         self.reachy_mini.goto_target(
             np.array(data["set_target_data"][0]["head"]),
-            antennas=data["set_target_data"][0]["antennas"],
+            antennas=-np.array(data["set_target_data"][0]["antennas"]),
             body_yaw=data["set_target_data"][0].get("body_yaw", 0.0),
             duration=first_duration,
             method="minjerk",
@@ -295,10 +296,10 @@ class EmotionPlayer:
                 # Joint interpolations are easy:
                 antennas_joints = np.array([lerp(pos_prev, pos_next, alpha) for pos_prev, pos_next in zip(antennas_prev, antennas_next)])
                 body_yaw = lerp(body_yaw_prev, body_yaw_next, alpha)
-                
+
                 # Head position interpolation is more complex:
                 head_pose = linear_pose_interpolation(head_prev, head_next, alpha)
-                self.reachy_mini.set_target(head_pose, antennas_joints, body_yaw=body_yaw)
+                self.reachy_mini.set_target(head_pose, -antennas_joints, body_yaw=body_yaw)
 
                 calculation_duration = time.time() - t0 - current_time
                 margin = dt - calculation_duration
@@ -415,10 +416,31 @@ def run_all_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: fl
             player.thread.join()  # Ensure this emotion is finished before the next
         # Optional short pause between emotions
         time.sleep(0.5)
-
+        
+        
 def run_scripted_emotions_mode(ip: str, audio_device: Optional[str], audio_offset: float):
     player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
-    emotions_delay = [("enthusiastic1", 5.5), ("welcoming2", 5.0), ("laughing1", 0.5), ] #("resigned1", 2.0), ] 
+    emotions_delay = [("curios1", 3.0)] #("resigned1", 2.0), ] 
+
+    
+    player.reachy_mini.goto_sleep()
+    input("press enter to start scripted emotions")
+    player.reachy_mini.wake_up()
+    time.sleep(1.0)
+    
+    while True:
+        for emotion, delay in emotions_delay:
+            print("\n" + "=" * 40)
+            print(f"==== PLAYING EMOTION: {emotion.upper()} ====")
+            print("=" * 40 + "\n")
+            player.play_emotion(emotion)
+            if player.thread:
+                player.thread.join()
+            time.sleep(delay)  # Wait for the specified delay before the next emotion
+
+def run_scripted_emotions_mode_old(ip: str, audio_device: Optional[str], audio_offset: float):
+    player = EmotionPlayer(ip, audio_device, audio_offset, RECORD_FOLDER, auto_start=True)
+    emotions_delay = [("enthusiastic1", 3.0), ("welcoming2", 3.0), ("curios1", 3.0), ("laughing1", 3.0), ] #("resigned1", 2.0), ] 
     death_look = np.array([
         [ 0.92037855, -0.3900239,   0.02801237, -0.01335223],
         [ 0.39013759,  0.92075533,  0.00151064, -0.00303172],
@@ -427,33 +449,33 @@ def run_scripted_emotions_mode(ip: str, audio_device: Optional[str], audio_offse
     ])
     
     input("press enter to start scripted emotions")
-    
-    for emotion, delay in emotions_delay:
-        print("\n" + "=" * 40)
-        print(f"==== PLAYING EMOTION: {emotion.upper()} ====")
-        print("=" * 40 + "\n")
-        player.play_emotion(emotion)
-        if player.thread:
-            player.thread.join()
-        time.sleep(delay)  # Wait for the specified delay before the next emotion
+    while True:
+        for emotion, delay in emotions_delay:
+            print("\n" + "=" * 40)
+            print(f"==== PLAYING EMOTION: {emotion.upper()} ====")
+            print("=" * 40 + "\n")
+            player.play_emotion(emotion)
+            if player.thread:
+                player.thread.join()
+            time.sleep(delay)  # Wait for the specified delay before the next emotion
         
-    with player.lock:
-        player.stop()  # Stop current playback if any.
-        # Stop idle thread if it's running.
-        if player.idle_thread and player.idle_thread.is_alive():
-            player.idle_stop_event.set()
-            player.idle_thread.join()
-            player.idle_stop_event.clear()
-        player.stop_event.clear()
-    player.reachy_mini.goto_target(head=death_look, antennas=np.array([0.0, 0.0]), body_yaw=0.0, duration=2.0)
+    # with player.lock:
+    #     player.stop()  # Stop current playback if any.
+    #     # Stop idle thread if it's running.
+    #     if player.idle_thread and player.idle_thread.is_alive():
+    #         player.idle_stop_event.set()
+    #         player.idle_thread.join()
+    #         player.idle_stop_event.clear()
+    #     player.stop_event.clear()
+    # player.reachy_mini.goto_target(head=death_look, antennas=np.array([0.0, 0.0]), body_yaw=0.0, duration=2.0)
 
-    time.sleep(3.0)
+    # time.sleep(3.0)
         
 
-    player.play_emotion("resigned1")
-    if player.thread:
-        player.thread.join()
-    time.sleep(20000.0)
+    # player.play_emotion("resigned1")
+    # if player.thread:
+    #     player.thread.join()
+    # time.sleep(20000.0)
     
     
     
@@ -489,7 +511,7 @@ def main():
     if args.all_emotions:
         run_all_emotions_mode(args.ip, args.audio_device, args.audio_offset)
     elif args.script:
-        run_scripted_emotions_mode(args.ip, args.audio_device, args.audio_offset)
+        run_scripted_emotions_mode_old(args.ip, args.audio_device, args.audio_offset)
     elif args.list:
         print_available_emotions()
     elif args.server:

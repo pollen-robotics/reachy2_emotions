@@ -379,12 +379,15 @@ class JoyTeleop:
                 # joy
                 new_l = -(self.left_joy) * MAX_ANTENNA_ANGLE - self.antenna_vibration_offset
                 new_r = (self.right_joy) * MAX_ANTENNA_ANGLE + self.antenna_vibration_offset
+                # Flip signs to match updated antenna convention.
+                target_l = -new_l
+                target_r = -new_r
                 if (
-                    abs(new_l - reachy.head.l_antenna.goal_position) > 0.1
-                    or abs(new_r - reachy.head.r_antenna.goal_position) > 0.1
+                    abs(target_l - reachy.head.l_antenna.goal_position) > 0.1
+                    or abs(target_r - reachy.head.r_antenna.goal_position) > 0.1
                 ):
-                    reachy.head.l_antenna.goal_position = new_l
-                    reachy.head.r_antenna.goal_position = new_r
+                    reachy.head.l_antenna.goal_position = target_l
+                    reachy.head.r_antenna.goal_position = target_r
                     reachy.send_goal_positions(check_positions=False)
                 # print(f"antenna L, R: {reachy.head.l_antenna.goal_position}, {reachy.head.r_antenna.goal_position}")
 
